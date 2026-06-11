@@ -10,11 +10,7 @@ const PARTNERS_FILE = path.join(DATA_DIR, 'partners.json');
 const GROUPS_FILE = path.join(DATA_DIR, 'groups.json');
 const IMAGES_FILE = path.join(DATA_DIR, 'images.json');
 const MERGED_DATA_FILE = path.join(DATA_DIR, 'data.json');
-const TEMPLATE_FILE = './template.html';
-const OUTPUT_FILE = './docs/index.html';
-
-// 模板中的占位符（必须与 HTML 中一致）
-const PLACEHOLDER = 'ENCRYPTED_DATA_PLACEHOLDER';
+const ENCRYPTED_DATA_FILE = path.join(DATA_DIR, 'data.js');
 
 async function getPassword() {
   const rl = readline.createInterface({
@@ -122,31 +118,10 @@ async function build() {
   const encrypted = CryptoJS.AES.encrypt(plainText, password).toString();
   console.log('✅ 数据加密成功');
 
-  // 读取 HTML 模板
-  let template;
-  try {
-    template = fs.readFileSync(TEMPLATE_FILE, 'utf8');
-  } catch (err) {
-    console.error(`❌ 无法读取模板 ${TEMPLATE_FILE}:`, err.message);
-    process.exit(1);
-  }
-
-  // 替换占位符
-  if (!template.includes(PLACEHOLDER)) {
-    console.error(`❌ 模板中未找到占位符 "${PLACEHOLDER}"`);
-    process.exit(1);
-  }
-  const finalHtml = template.replace(PLACEHOLDER, encrypted);
-
-  // 确保输出目录存在
-  const outDir = path.dirname(OUTPUT_FILE);
-  if (!fs.existsSync(outDir)) {
-    fs.mkdirSync(outDir, { recursive: true });
-  }
-
-  // 写入最终 HTML
-  fs.writeFileSync(OUTPUT_FILE, finalHtml, 'utf8');
-  console.log(`🎉 生成成功！文件已保存至: ${OUTPUT_FILE}`);
+  // 写入加密数据到 data/data.js
+  const dataJsContent = `window.ENCRYPTED_DATA = '${encrypted}';`;
+  fs.writeFileSync(ENCRYPTED_DATA_FILE, dataJsContent, 'utf8');
+  console.log(`✅ 已生成 ${ENCRYPTED_DATA_FILE}`);
   console.log(`🔐 访问密码: ${password}`);
 }
 

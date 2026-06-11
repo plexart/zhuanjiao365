@@ -460,10 +460,9 @@
     </div>
     </div>
 
+    <script src="data/data.js"></script>
     <script>
-      // ================= 加密数据占位符（构建时自动替换）=================
-      const ENCRYPTED_DATA = 'ENCRYPTED_DATA_PLACEHOLDER'; // 构建脚本替换此占位符
-      // ================================================================
+      // 加密数据从 data.js 加载（window.ENCRYPTED_DATA）
 
       let appData = null;
       let partnerPhotos = []; // AlbumType == "4"
@@ -862,7 +861,7 @@
       function decryptAndLoad(password) {
         try {
           const decrypted = CryptoJS.AES.decrypt(
-            ENCRYPTED_DATA.trim(),
+            window.ENCRYPTED_DATA.trim(),
             password,
           );
           const plainText = decrypted.toString(CryptoJS.enc.Utf8);
@@ -924,8 +923,8 @@
         });
       });
 
-      // 若占位符未被构建替换，提示
-      if (ENCRYPTED_DATA === 'ENCRYPTED_DATA_PLACEHOLDER') {
+      // 若加密数据未加载，提示
+      if (!window.ENCRYPTED_DATA) {
         lockError.innerText = '⚠️ 请先运行构建脚本 (npm run build) 加密数据';
       }
     </script>
