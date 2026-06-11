@@ -726,6 +726,12 @@
         imgContainer.style.alignItems = 'center';
         imgContainer.style.justifyContent = 'center';
 
+        // 创建loading指示器
+        const loading = document.createElement('div');
+        loading.innerHTML = '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,0.3)" stroke-width="4"/><path d="M20 4A16 16 0 0 1 36 20" stroke="white" stroke-width="4" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 20 20" to="360 20 20" dur="1s" repeatCount="indefinite"/></path></svg>';
+        loading.style.position = 'absolute';
+        imgContainer.appendChild(loading);
+
         const img = document.createElement('img');
         img.src = url;
         img.style.maxWidth = '100%';
@@ -733,9 +739,17 @@
         img.style.borderRadius = '12px';
         img.style.transition = 'transform 0.2s ease';
         img.style.cursor = 'grab';
+        img.style.opacity = '0';
+        img.style.transition = 'opacity 0.3s ease, transform 0.2s ease';
         let scale = 1;
         let isDragging = false;
         let startX, startY, translateX = 0, translateY = 0;
+
+        // 图片加载完成后显示
+        img.onload = () => {
+          loading.style.display = 'none';
+          img.style.opacity = '1';
+        };
 
         img.addEventListener('mousedown', (e) => {
           if (scale > 1) {
@@ -928,12 +942,7 @@
           if (currentIndex > 0) {
             currentIndex--;
             const newPhoto = photos[currentIndex];
-            img.src = newPhoto.DownPhotoPic;
-            scale = 1;
-            translateX = 0;
-            translateY = 0;
-            updateTransform();
-            updateSelectBtn();
+            loadImage(newPhoto.DownPhotoPic);
           }
         });
 
@@ -957,14 +966,21 @@
           if (currentIndex < photos.length - 1) {
             currentIndex++;
             const newPhoto = photos[currentIndex];
-            img.src = newPhoto.DownPhotoPic;
-            scale = 1;
-            translateX = 0;
-            translateY = 0;
-            updateTransform();
-            updateSelectBtn();
+            loadImage(newPhoto.DownPhotoPic);
           }
         });
+
+        // 加载图片函数
+        function loadImage(imgUrl) {
+          loading.style.display = 'block';
+          img.style.opacity = '0';
+          img.src = imgUrl;
+          scale = 1;
+          translateX = 0;
+          translateY = 0;
+          updateTransform();
+          updateSelectBtn();
+        }
 
         // 选择/反选按钮（圆形，类似列表页）
         const selectBtn = createCircleBtn('', () => {
