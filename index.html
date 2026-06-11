@@ -383,6 +383,104 @@
         color: #f59e0b;
         margin-top: 12px;
       }
+
+      /* 合并按钮样式 */
+      .merge-btn {
+        background: #8b5cf6;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        margin-bottom: 16px;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .merge-btn:active {
+        transform: scale(0.96);
+      }
+
+      /* 合并弹窗样式 */
+      .merge-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+      }
+      .merge-modal-content {
+        background: white;
+        border-radius: 24px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        animation: modalPop 0.3s ease;
+      }
+      .merge-modal-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+        color: #8b5cf6;
+      }
+      .merge-modal-text {
+        font-size: 0.9rem;
+        color: #475569;
+        line-height: 1.6;
+        margin-bottom: 16px;
+      }
+      .merge-modal-textarea {
+        width: 100%;
+        min-height: 120px;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid #cbd5e1;
+        font-family: monospace;
+        font-size: 0.8rem;
+        resize: vertical;
+        margin-bottom: 16px;
+      }
+      .merge-modal-buttons {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+      }
+      .merge-modal-cancel {
+        background: #f1f5f9;
+        color: #475569;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 40px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .merge-modal-confirm {
+        background: #8b5cf6;
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 40px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .merge-modal-confirm:active,
+      .merge-modal-cancel:active {
+        transform: scale(0.96);
+      }
+      .merge-result-tip {
+        text-align: center;
+        font-size: 0.85rem;
+        color: #10b981;
+        margin-top: 12px;
+      }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
   </head>
@@ -436,6 +534,7 @@
             <label>📌 选择小组</label>
             <select id="groupSelect"></select>
           </div>
+          <button class="merge-btn" id="mergeBtn">🔗 合并他人选择</button>
           <div id="groupPhotosGrid" class="photo-grid"></div>
           <div id="groupResult" class="result-area"></div>
           <div id="groupCopyTip" class="copy-tip"></div>
@@ -456,6 +555,25 @@
         <div class="confirm-modal-fail-tip" id="modalFailTip" style="display: none;">
           ⚠️ 如自动复制失败，请手动复制上方内容
         </div>
+      </div>
+    </div>
+
+    <!-- 合并弹窗 -->
+    <div class="merge-modal" id="mergeModal">
+      <div class="merge-modal-content">
+        <div class="merge-modal-title">🔗 合并他人选择</div>
+        <div class="merge-modal-text">
+          请将其他人发来的选择内容粘贴到下方，点击合并后会自动合并到你的选择中。
+        </div>
+        <textarea class="merge-modal-textarea" id="mergeTextarea" placeholder="示例格式：
+小组名:
+  - 12345678
+  - 87654321"></textarea>
+        <div class="merge-modal-buttons">
+          <button class="merge-modal-cancel" id="mergeCancelBtn">取消</button>
+          <button class="merge-modal-confirm" id="mergeConfirmBtn">合并</button>
+        </div>
+        <div class="merge-result-tip" id="mergeResultTip"></div>
       </div>
     </div>
     </div>
@@ -689,10 +807,7 @@
         if (selectedGroupPhotoIds.has(photoId)) {
           selectedGroupPhotoIds.delete(photoId);
         } else {
-          if (selectedGroupPhotoIds.size >= 12) {
-            alert('小组照最多只能选择 12 张！');
-            return;
-          }
+          // 移除12张限制，允许超选
           selectedGroupPhotoIds.add(photoId);
         }
         renderGroupPhotos();
@@ -700,6 +815,53 @@
         groupResultDiv.style.display = 'none';
         groupCopyTipSpan.innerText = '';
         saveToStorage(); // 保存到 localStorage
+      }
+
+      // 合并功能
+      function openMergeModal() {
+        document.getElementById('mergeTextarea').value = '';
+        document.getElementById('mergeResultTip').innerText = '';
+        document.getElementById('mergeModal').style.display = 'flex';
+      }
+
+      function closeMergeModal() {
+        document.getElementById('mergeModal').style.display = 'none';
+      }
+
+      function mergeSelections() {
+        const textarea = document.getElementById('mergeTextarea');
+        const text = textarea.value.trim();
+        if (!text) {
+          alert('请输入要合并的内容');
+          return;
+        }
+
+        // 解析输入的内容，提取图片ID
+        const mergedIds = new Set(selectedGroupPhotoIds);
+        const lines = text.split('\n');
+        let addedCount = 0;
+
+        for (const line of lines) {
+          // 匹配 "- 数字" 格式
+          const match = line.match(/^\s*-\s*(\d+)/);
+          if (match) {
+            const id = parseInt(match[1]);
+            if (!mergedIds.has(id)) {
+              mergedIds.add(id);
+              addedCount++;
+            }
+          }
+        }
+
+        if (addedCount > 0) {
+          selectedGroupPhotoIds = mergedIds;
+          renderGroupPhotos();
+          updateSelectionInfo();
+          saveToStorage();
+          document.getElementById('mergeResultTip').innerText = `✅ 已合并 ${addedCount} 张图片，当前共 ${selectedGroupPhotoIds.size} 张`;
+        } else {
+          document.getElementById('mergeResultTip').innerText = '没有新的图片被添加';
+        }
       }
 
       function updateSelectionInfo() {
@@ -749,16 +911,21 @@
             alert('请至少选择一张小组照');
             return;
           }
-          if (selectedGroupPhotoIds.size !== 12) {
-            alert(`小组照必须选择12张！当前已选 ${selectedGroupPhotoIds.size} 张，请继续选择。`);
-            return;
-          }
+          const count = selectedGroupPhotoIds.size;
+          // 不再强制要求12张，允许少选或超选
           const ids = Array.from(selectedGroupPhotoIds).sort((a, b) => a - b);
           outputText = `${selectedGroup}:\n`;
           ids.forEach((id) => {
             outputText += `  - ${id}\n`;
           });
           outputText = outputText.trim();
+
+          // 如果不是12张，给出提示
+          if (count !== 12) {
+            if (!confirm(`当前已选 ${count} 张小组照（不是12张），确定要复制吗？`)) {
+              return;
+            }
+          }
         }
 
         // 尝试复制到剪贴板
@@ -916,6 +1083,18 @@
       document.getElementById('confirmModal').addEventListener('click', (e) => {
         if (e.target.id === 'confirmModal') {
           e.target.style.display = 'none';
+        }
+      });
+
+      // 合并按钮
+      document.getElementById('mergeBtn').addEventListener('click', openMergeModal);
+
+      // 合并弹窗
+      document.getElementById('mergeCancelBtn').addEventListener('click', closeMergeModal);
+      document.getElementById('mergeConfirmBtn').addEventListener('click', mergeSelections);
+      document.getElementById('mergeModal').addEventListener('click', (e) => {
+        if (e.target.id === 'mergeModal') {
+          closeMergeModal();
         }
       });
 
