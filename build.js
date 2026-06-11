@@ -11,7 +11,7 @@ const GROUPS_FILE = path.join(DATA_DIR, 'groups.json');
 const IMAGES_FILE = path.join(DATA_DIR, 'images.json');
 const MERGED_DATA_FILE = path.join(DATA_DIR, 'data.json');
 const TEMPLATE_FILE = './template.html';
-const OUTPUT_FILE = './dist/index.html';
+const OUTPUT_FILE = './docs/index.html';
 
 // 模板中的占位符（必须与 HTML 中一致）
 const PLACEHOLDER = 'ENCRYPTED_DATA_PLACEHOLDER';
