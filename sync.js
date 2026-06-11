@@ -6,9 +6,85 @@ const readline = require('readline');
 const DATA_DIR = './data';
 const RESPONSE_FILE = path.join(DATA_DIR, 'response.json');
 const SELECTED_FILE = path.join(DATA_DIR, 'selected.json');
+const ENV_FILE = '.env';
 
 // API 配置
 const API_URL = 'https://miniapp.zhuanjiao365.com/Ashx/wechatEdit.ashx';
+
+/**
+ * 解析 .env 文件内容
+ * @param {string} content - .env 文件内容
+ * @returns {Object} - 键值对对象
+ */
+function parseEnv(content) {
+  const result = {};
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex === -1) continue;
+    const key = trimmed.slice(0, eqIndex).trim();
+    const value = trimmed.slice(eqIndex + 1).trim();
+    result[key] = value;
+  }
+  return result;
+}
+
+/**
+ * 将对象写入 .env 文件
+ * @param {Object} envObj - 环境变量对象
+ */
+function writeEnv(envObj) {
+  let content = '';
+  for (const [key, value] of Object.entries(envObj)) {
+    content += `${key}=${value}\n`;
+  }
+  fs.writeFileSync(ENV_FILE, content, 'utf8');
+}
+
+/**
+ * 从 .env 读取配置，如果不存在或缺少值则提示用户输入
+ * @returns {{ selectMID: string, editOrderAlbumInfoSigner: string }}
+ */
+async function getCredentials() {
+  let env = {};
+
+  // 尝试读取 .env 文件
+  if (fs.existsSync(ENV_FILE)) {
+    const content = fs.readFileSync(ENV_FILE, 'utf8');
+    env = parseEnv(content);
+  }
+
+  // 检查并获取 selectMID
+  let selectMID = env.selectMID;
+  if (!selectMID) {
+    selectMID = await askQuestion('请输入 selectMID: ');
+    if (!selectMID) {
+      console.error('❌ selectMID 不能为空');
+      process.exit(1);
+    }
+  }
+
+  // 检查并获取 editOrderAlbumInfoSigner
+  let editOrderAlbumInfoSigner = env.editOrderAlbumInfoSigner;
+  if (!editOrderAlbumInfoSigner) {
+    editOrderAlbumInfoSigner = await askQuestion('请输入 edit_OrderAlbumInfo signer: ');
+    if (!editOrderAlbumInfoSigner) {
+      console.error('❌ edit_OrderAlbumInfo signer 不能为空');
+      process.exit(1);
+    }
+  }
+
+  // 如果有任何新值，更新 .env 文件
+  if (!env.selectMID || !env.editOrderAlbumInfoSigner) {
+    env.selectMID = selectMID;
+    env.editOrderAlbumInfoSigner = editOrderAlbumInfoSigner;
+    writeEnv(env);
+    console.log(`✅ 已保存配置到 ${ENV_FILE}`);
+  }
+
+  return { selectMID, editOrderAlbumInfoSigner: editOrderAlbumInfoSigner };
+}
 
 async function askQuestion(query) {
   const rl = readline.createInterface({
@@ -51,7 +127,7 @@ function loadSelectedData() {
 }
 
 // 发送 HTTP 请求
-async function sendRequest(orderAlbumId, state, selectMID, signer) {
+async function sendRequest(orderAlbumId, state, selectMID, editOrderAlbumInfoSigner) {
   const saveInfo = JSON.stringify({
     OrderAlbumID: orderAlbumId,
     State: state.toString(), // "1" = 未选, "2" = 已选
@@ -62,7 +138,7 @@ async function sendRequest(orderAlbumId, state, selectMID, signer) {
   const payload = {
     fun: 'Edit_OrderAlbumInfo',
     saveInfo: saveInfo,
-    signer: signer,
+    signer: editOrderAlbumInfoSigner,
   };
 
   console.log(
@@ -98,18 +174,8 @@ async function sendRequest(orderAlbumId, state, selectMID, signer) {
 }
 
 async function sync() {
-  // 获取参数
-  const selectMID = await askQuestion('请输入 SelectMID: ');
-  if (!selectMID) {
-    console.error('❌ SelectMID 不能为空');
-    process.exit(1);
-  }
-
-  const signer = await askQuestion('请输入 Signer: ');
-  if (!signer) {
-    console.error('❌ Signer 不能为空');
-    process.exit(1);
-  }
+  // 获取凭证（从 .env 读取或提示用户输入）
+  const { selectMID, editOrderAlbumInfoSigner } = await getCredentials();
 
   // 加载数据
   console.log('📝 加载数据...');
@@ -192,12 +258,12 @@ async function sync() {
 
   // 先改为未选
   for (const id of toDeselect) {
-    await sendRequest(id, 1, selectMID, signer);
+    await sendRequest(id, 1, selectMID, editOrderAlbumInfoSigner);
   }
 
   // 再改为已选
   for (const id of validToSelect) {
-    await sendRequest(id, 2, selectMID, signer);
+    await sendRequest(id, 2, selectMID, editOrderAlbumInfoSigner);
   }
 
   console.log('\n✅ 同步完成');
