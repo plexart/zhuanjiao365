@@ -792,6 +792,8 @@
         img.addEventListener('dblclick', (e) => {
           if (scale === 1) {
             scale = 2;
+            translateX = 0;
+            translateY = 0;
           } else {
             scale = 1;
             translateX = 0;
@@ -855,6 +857,8 @@
             const currentDistance = Math.sqrt(dx * dx + dy * dy);
             const scaleRatio = currentDistance / initialPinchDistance;
             scale = Math.min(Math.max(currentScale * scaleRatio, 0.5), 4);
+            translateX = 0;
+            translateY = 0;
             updateTransform();
             e.preventDefault();
           }
