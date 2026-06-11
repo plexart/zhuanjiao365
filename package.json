@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node build.js",
     "sync": "node sync.js",
-    "download": "node download.js"
+    "download": "node download.js",
+    "download-images": "node download-images.js"
   },
   "dependencies": {
     "crypto-js": "^4.2.0"

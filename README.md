@@ -37,6 +37,27 @@ npm run download
 
 This will fetch `response.json` and save it to `data/`.
 
+## Download Photos
+
+Download all photos organized by category:
+
+```bash
+npm run download-images
+```
+
+Photos are downloaded to subdirectories under `data/`:
+
+| AlbumType | Directory         | Notes                                          |
+| --------- | ----------------- | ---------------------------------------------- |
+| 0         | `data/校园风景`   | Campus scenery                                 |
+| 1         | `data/集体造型照` | Group poses                                    |
+| 2         | `data/小组照`     | Small group photos                             |
+| 3         | `data/个人照`     | Individual photos (with Remark subdirectories) |
+| 4         | `data/同桌照`     | Deskmate photos                                |
+
+- Existing files are skipped (no re-download)
+- Progress is shown during download
+
 ## Build
 
 ```bash
