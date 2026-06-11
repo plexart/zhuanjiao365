@@ -10,12 +10,36 @@ https://plexart.github.io/zhuanjiao365/
 2. Group List
    Edit `data/groups.json` to provide the group list.
 
-3. User Fiddler to capture the response from zhuanjiao365 for the function `info_OrderAlbumList`
-   Save the response to `data/response.json`
+## Configuration
+
+Copy `.env.example` to `.env` and fill in your credentials:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your values:
+
+- `orderID` - Your order ID (e.g., `88888`)
+- `editOrderAlbumInfoSigner` - Signer for the edit API (sync selections)
+- `infoOrderAlbumListSigner` - Signer for the info API (download photo list)
+- `selectMID` - Your selectMID for syncing selections
+
+> **Note:** You only need to provide these values once. They will be saved to `.env` for future use.
+
+## Download Photo List
+
+Download the latest photo list from the server:
+
+```bash
+npm run download
+```
+
+This will fetch `response.json` and save it to `data/`.
 
 ## Build
 
-```
+```bash
 npm run build
 ```
 
@@ -23,7 +47,7 @@ npm run build
 
 Sync your photo selections with the server:
 
-```
+```bash
 npm run sync
 ```
 
@@ -38,5 +62,4 @@ npm run sync
 The script will:
 1. Compare `selected.json` with the current state in `response.json`
 2. Show you which photos will be selected/deselected
-3. Ask for your `SelectMID` and `Signer` (from the app)
-4. Send requests to sync your selections
+3. Send requests to sync your selections using credentials from `.env`

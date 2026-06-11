@@ -2,58 +2,22 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 
+const { loadEnv, writeEnv, getEnv } = require('./lib/env');
+
 // 配置文件路径
 const DATA_DIR = './data';
 const RESPONSE_FILE = path.join(DATA_DIR, 'response.json');
 const SELECTED_FILE = path.join(DATA_DIR, 'selected.json');
-const ENV_FILE = '.env';
 
 // API 配置
 const API_URL = 'https://miniapp.zhuanjiao365.com/Ashx/wechatEdit.ashx';
-
-/**
- * 解析 .env 文件内容
- * @param {string} content - .env 文件内容
- * @returns {Object} - 键值对对象
- */
-function parseEnv(content) {
-  const result = {};
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eqIndex = trimmed.indexOf('=');
-    if (eqIndex === -1) continue;
-    const key = trimmed.slice(0, eqIndex).trim();
-    const value = trimmed.slice(eqIndex + 1).trim();
-    result[key] = value;
-  }
-  return result;
-}
-
-/**
- * 将对象写入 .env 文件
- * @param {Object} envObj - 环境变量对象
- */
-function writeEnv(envObj) {
-  let content = '';
-  for (const [key, value] of Object.entries(envObj)) {
-    content += `${key}=${value}\n`;
-  }
-  fs.writeFileSync(ENV_FILE, content, 'utf8');
-}
 
 /**
  * 从 .env 读取配置，如果不存在或缺少值则提示用户输入
  * @returns {{ selectMID: string, editOrderAlbumInfoSigner: string }}
  */
 async function getCredentials() {
-  let env = {};
-
-  // 尝试读取 .env 文件
-  if (fs.existsSync(ENV_FILE)) {
-    const content = fs.readFileSync(ENV_FILE, 'utf8');
-    env = parseEnv(content);
-  }
+  let env = loadEnv();
 
   // 检查并获取 selectMID
   let selectMID = env.selectMID;
@@ -68,7 +32,9 @@ async function getCredentials() {
   // 检查并获取 editOrderAlbumInfoSigner
   let editOrderAlbumInfoSigner = env.editOrderAlbumInfoSigner;
   if (!editOrderAlbumInfoSigner) {
-    editOrderAlbumInfoSigner = await askQuestion('请输入 edit_OrderAlbumInfo signer: ');
+    editOrderAlbumInfoSigner = await askQuestion(
+      '请输入 edit_OrderAlbumInfo signer: ',
+    );
     if (!editOrderAlbumInfoSigner) {
       console.error('❌ edit_OrderAlbumInfo signer 不能为空');
       process.exit(1);
@@ -80,10 +46,10 @@ async function getCredentials() {
     env.selectMID = selectMID;
     env.editOrderAlbumInfoSigner = editOrderAlbumInfoSigner;
     writeEnv(env);
-    console.log(`✅ 已保存配置到 ${ENV_FILE}`);
+    console.log(`✅ 已保存配置到 .env`);
   }
 
-  return { selectMID, editOrderAlbumInfoSigner: editOrderAlbumInfoSigner };
+  return { selectMID, editOrderAlbumInfoSigner };
 }
 
 async function askQuestion(query) {
@@ -145,16 +111,18 @@ async function sendRequest(orderAlbumId, state, selectMID, editOrderAlbumInfoSig
     `   发送请求: OrderAlbumID=${orderAlbumId}, State=${state === 1 ? '未选' : '已选'}`,
   );
 
+  // 从 env 获取 headers，支持自定义
+  const userAgent = getEnv('USER_AGENT');
+  const referer = getEnv('REFERER');
+
   try {
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
         Host: 'miniapp.zhuanjiao365.com',
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090a13) UnifiedPCWindowsWechat(0xf2541917) XWEB/19749',
+        'User-Agent': userAgent,
         'Content-Type': 'application/json',
-        Referer:
-          'https://servicewechat.com/wxa796acda177dec09/137/page-frame.html',
+        Referer: referer,
       },
       body: JSON.stringify(payload),
     });
