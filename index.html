@@ -223,22 +223,37 @@
         display: block;
         background: #e2e8f0;
       }
-      .zoom-icon {
+      .select-checkbox {
         position: absolute;
-        bottom: 6px;
-        right: 6px;
-        background: rgba(0, 0, 0, 0.6);
+        top: 8px;
+        left: 8px;
+        background: rgba(59, 130, 246, 0.9);
         border-radius: 30px;
-        width: 28px;
-        height: 28px;
+        width: 24px;
+        height: 24px;
         display: flex;
         align-items: center;
         justify-content: center;
+        font-size: 12px;
         color: white;
-        font-size: 16px;
-        backdrop-filter: blur(4px);
         cursor: pointer;
         z-index: 2;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: all 0.15s;
+      }
+      .select-checkbox:hover {
+        transform: scale(1.1);
+      }
+      .photo-item.selected .select-checkbox {
+        background: #3b82f6;
+      }
+      .select-checkbox.empty {
+        background: rgba(0, 0, 0, 0.3);
+        color: transparent;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+      }
+      .select-checkbox.checked {
+        color: white;
       }
       .photo-id {
         padding: 8px 8px 10px;
@@ -539,7 +554,7 @@
           <div id="groupResult" class="result-area"></div>
           <div id="groupCopyTip" class="copy-tip"></div>
         </div>
-        <footer>🔍 点击图片选择 | 点击放大镜图标查看大图</footer>
+        <footer>🔍 点击图片查看大图 | 点击左上角小框选择</footer>
       </div>
     </div>
 
@@ -719,37 +734,39 @@
           const isSelected = selectedPartnerPhotoId === photo.OrderAlbumID;
           html += `
                 <div class="photo-item ${isSelected ? 'selected' : ''}" data-id="${photo.OrderAlbumID}">
-                    <div class="photo-img-wrapper" data-select-id="${photo.OrderAlbumID}">
+                    <div class="photo-img-wrapper" data-big="${photo.DownPhotoPic}">
                         <img src="${photo.SmallPath}" alt="缩略图" loading="lazy">
-                        <div class="zoom-icon" data-big="${photo.DownPhotoPic}">🔍</div>
+                        <div class="select-checkbox ${isSelected ? 'checked' : 'empty'}" data-select-id="${photo.OrderAlbumID}">
+                            ${isSelected ? '✓' : ''}
+                        </div>
                     </div>
                     <div class="photo-id">ID: ${photo.OrderAlbumID}</div>
-                    ${isSelected ? '<div class="badge-check">✓</div>' : ''}
                 </div>
             `;
         });
         partnerPhotosDiv.innerHTML = html;
 
-        // 绑定选择事件（点击图片区域）
+        // 绑定查看大图事件（点击图片区域）
         document
-          .querySelectorAll(
-            '#partnerPhotosGrid .photo-img-wrapper[data-select-id]',
-          )
+          .querySelectorAll('#partnerPhotosGrid .photo-img-wrapper')
           .forEach((wrapper) => {
             wrapper.addEventListener('click', (e) => {
+              // 如果点击的是选择框，不处理大图
+              if (e.target.classList.contains('select-checkbox')) return;
               e.stopPropagation();
-              const photoId = parseInt(wrapper.dataset.selectId);
-              selectPartnerPhoto(photoId);
+              const bigUrl = wrapper.dataset.big;
+              if (bigUrl) showBigImage(bigUrl);
             });
           });
-        // 绑定放大镜事件
+
+        // 绑定选择事件（点击选择框）
         document
-          .querySelectorAll('#partnerPhotosGrid .zoom-icon')
-          .forEach((zoom) => {
-            zoom.addEventListener('click', (e) => {
+          .querySelectorAll('#partnerPhotosGrid .select-checkbox')
+          .forEach((checkbox) => {
+            checkbox.addEventListener('click', (e) => {
               e.stopPropagation();
-              const bigUrl = zoom.dataset.big;
-              if (bigUrl) showBigImage(bigUrl);
+              const photoId = parseInt(checkbox.dataset.selectId);
+              selectPartnerPhoto(photoId);
             });
           });
       }
@@ -779,35 +796,39 @@
           const isSelected = selectedGroupPhotoIds.has(photo.OrderAlbumID);
           html += `
                 <div class="photo-item ${isSelected ? 'selected' : ''}" data-id="${photo.OrderAlbumID}">
-                    <div class="photo-img-wrapper" data-select-id="${photo.OrderAlbumID}">
+                    <div class="photo-img-wrapper" data-big="${photo.DownPhotoPic}">
                         <img src="${photo.SmallPath}" alt="缩略图" loading="lazy">
-                        <div class="zoom-icon" data-big="${photo.DownPhotoPic}">🔍</div>
+                        <div class="select-checkbox ${isSelected ? 'checked' : 'empty'}" data-select-id="${photo.OrderAlbumID}">
+                            ${isSelected ? '✓' : ''}
+                        </div>
                     </div>
                     <div class="photo-id">ID: ${photo.OrderAlbumID}</div>
-                    ${isSelected ? '<div class="badge-check">✓</div>' : ''}
                 </div>
             `;
         });
         groupPhotosDiv.innerHTML = html;
 
+        // 绑定查看大图事件（点击图片区域）
         document
-          .querySelectorAll(
-            '#groupPhotosGrid .photo-img-wrapper[data-select-id]',
-          )
+          .querySelectorAll('#groupPhotosGrid .photo-img-wrapper')
           .forEach((wrapper) => {
             wrapper.addEventListener('click', (e) => {
+              // 如果点击的是选择框，不处理大图
+              if (e.target.classList.contains('select-checkbox')) return;
               e.stopPropagation();
-              const photoId = parseInt(wrapper.dataset.selectId);
-              toggleGroupPhoto(photoId);
+              const bigUrl = wrapper.dataset.big;
+              if (bigUrl) showBigImage(bigUrl);
             });
           });
+
+        // 绑定选择事件（点击选择框）
         document
-          .querySelectorAll('#groupPhotosGrid .zoom-icon')
-          .forEach((zoom) => {
-            zoom.addEventListener('click', (e) => {
+          .querySelectorAll('#groupPhotosGrid .select-checkbox')
+          .forEach((checkbox) => {
+            checkbox.addEventListener('click', (e) => {
               e.stopPropagation();
-              const bigUrl = zoom.dataset.big;
-              if (bigUrl) showBigImage(bigUrl);
+              const photoId = parseInt(checkbox.dataset.selectId);
+              toggleGroupPhoto(photoId);
             });
           });
       }
