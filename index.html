@@ -728,7 +728,8 @@
         if (currentTab === 'partner') {
           const selectedPartner = partnerSelect.value;
           if (!selectedPartner) {
-            alert('请先选择一对同桌');
+            alert('请选择同桌名字');
+            document.querySelector('.scroll-area').scrollTo({ top: 0, behavior: 'smooth' });
             return;
           }
           if (!selectedPartnerPhotoId) {
@@ -740,7 +741,8 @@
           // 小组照
           const selectedGroup = groupSelect.value;
           if (!selectedGroup) {
-            alert('请先选择一个小组');
+            alert('请选择小组名字');
+            document.querySelector('.scroll-area').scrollTo({ top: 0, behavior: 'smooth' });
             return;
           }
           if (selectedGroupPhotoIds.size === 0) {
