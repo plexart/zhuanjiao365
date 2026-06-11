@@ -737,13 +737,21 @@
         img.style.maxWidth = '100%';
         img.style.maxHeight = '90vh';
         img.style.borderRadius = '12px';
-        img.style.transition = 'transform 0.2s ease';
         img.style.cursor = 'grab';
         img.style.opacity = '0';
-        img.style.transition = 'opacity 0.3s ease, transform 0.2s ease';
+        const SMOOTH_TRANSITION = 'opacity 0.3s ease, transform 0.2s ease';
+        const INSTANT_TRANSITION = 'opacity 0.3s ease, transform 0s';
+        img.style.transition = SMOOTH_TRANSITION;
+        const MIN_SCALE = 1;
+        const MAX_SCALE = 4;
         let scale = 1;
         let isDragging = false;
         let startX, startY, translateX = 0, translateY = 0;
+
+        // 缩放/拖动跟手时关闭过渡，离散缩放（双击/滚轮）时恢复平滑过渡
+        function setSmooth(on) {
+          img.style.transition = on ? SMOOTH_TRANSITION : INSTANT_TRANSITION;
+        }
 
         // 图片加载完成后显示
         img.onload = () => {
@@ -757,6 +765,7 @@
             startX = e.clientX - translateX;
             startY = e.clientY - translateY;
             img.style.cursor = 'grabbing';
+            setSmooth(false);
             e.preventDefault();
           }
         });
@@ -771,12 +780,14 @@
 
         img.addEventListener('mouseup', () => {
           isDragging = false;
-          img.style.cursor = scale > 1 ? 'grab' : 'grab';
+          img.style.cursor = scale > 1 ? 'grab' : 'default';
+          setSmooth(true);
         });
 
         img.addEventListener('mouseleave', () => {
           isDragging = false;
-          img.style.cursor = scale > 1 ? 'grab' : 'grab';
+          img.style.cursor = scale > 1 ? 'grab' : 'default';
+          setSmooth(true);
         });
 
         // 滚轮缩放
@@ -784,7 +795,8 @@
           e.preventDefault();
           const delta = e.deltaY > 0 ? 0.9 : 1.1;
           scale *= delta;
-          scale = Math.min(Math.max(0.5, scale), 4);
+          scale = Math.min(Math.max(MIN_SCALE, scale), MAX_SCALE);
+          setSmooth(true);
           updateTransform();
         });
 
@@ -799,10 +811,24 @@
             translateX = 0;
             translateY = 0;
           }
+          setSmooth(true);
           updateTransform();
         });
 
         function updateTransform() {
+          // 不允许缩小到比初始（贴合）尺寸更小
+          if (scale <= MIN_SCALE) {
+            scale = MIN_SCALE;
+            translateX = 0;
+            translateY = 0;
+          } else {
+            // 限制平移范围，使图片边缘不会移入视野露出空白
+            // offsetWidth/offsetHeight 为未缩放时的布局尺寸
+            const maxX = (img.offsetWidth * (scale - 1)) / 2;
+            const maxY = (img.offsetHeight * (scale - 1)) / 2;
+            translateX = Math.min(Math.max(translateX, -maxX), maxX);
+            translateY = Math.min(Math.max(translateY, -maxY), maxY);
+          }
           img.style.transform = `scale(${scale}) translate(${translateX / scale}px, ${translateY / scale}px)`;
           updateControlsVisibility();
         }
@@ -840,6 +866,7 @@
               touchStartTranslateX = translateX;
               touchStartTranslateY = translateY;
               isTouchDragging = false;
+              setSmooth(false);
             }
           } else if (e.touches.length === 2) {
             // 双指捏合
@@ -847,6 +874,7 @@
             const dy = e.touches[0].clientY - e.touches[1].clientY;
             initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
             currentScale = scale;
+            setSmooth(false);
             e.preventDefault();
           }
         }, { passive: false });
@@ -870,7 +898,8 @@
             const dy = e.touches[0].clientY - e.touches[1].clientY;
             const currentDistance = Math.sqrt(dx * dx + dy * dy);
             const scaleRatio = currentDistance / initialPinchDistance;
-            scale = Math.min(Math.max(currentScale * scaleRatio, 0.5), 4);
+            // 跟手缩放：手指捏合比例直接映射到图片缩放比例
+            scale = Math.min(Math.max(currentScale * scaleRatio, MIN_SCALE), MAX_SCALE);
             translateX = 0;
             translateY = 0;
             updateTransform();
@@ -879,13 +908,24 @@
         }, { passive: false });
 
         modal.addEventListener('touchend', (e) => {
-          if (e.changedTouches.length === 1 && !isTouchDragging && scale === 1) {
-            // 只有在未放大且未拖动的情况下才处理滑动切换
-            touchEndX = e.changedTouches[0].clientX;
-            touchEndY = e.changedTouches[0].clientY;
-            handleSwipeGesture();
+          if (e.touches.length === 0) {
+            // 所有手指离开
+            if (e.changedTouches.length === 1 && !isTouchDragging && scale === 1) {
+              // 只有在未放大且未拖动的情况下才处理滑动切换
+              touchEndX = e.changedTouches[0].clientX;
+              touchEndY = e.changedTouches[0].clientY;
+              handleSwipeGesture();
+            }
+            isTouchDragging = false;
+            setSmooth(true);
+          } else if (e.touches.length === 1) {
+            // 双指缩放后松开一指，重置单指拖动基准，避免跳动
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            touchStartTranslateX = translateX;
+            touchStartTranslateY = translateY;
+            isTouchDragging = false;
           }
-          isTouchDragging = false;
         }, { passive: true });
 
         function handleSwipeGesture() {
@@ -1035,7 +1075,7 @@
 
         // 关闭按钮
         const closeBtn = createCircleBtn('✕', () => {
-          modal.remove();
+          closeModal();
         });
 
         imgContainer.appendChild(prevBtn);
@@ -1050,32 +1090,26 @@
         // 点击背景关闭
         modal.addEventListener('click', (e) => {
           if (e.target === modal) {
-            modal.remove();
+            closeModal();
           }
         });
 
-        // ESC关闭
-        const escHandler = (e) => {
-          if (e.key === 'Escape') {
-            modal.remove();
-            document.removeEventListener('keydown', escHandler);
-          }
-        };
-        document.addEventListener('keydown', escHandler);
+        function closeModal() {
+          modal.remove();
+          document.removeEventListener('keydown', keyHandler);
+        }
 
-        // 键盘导航
-        const keyHandler = (e) => {
-          if (e.key === 'ArrowLeft') {
+        // 键盘：ESC 关闭，左右切换
+        function keyHandler(e) {
+          if (e.key === 'Escape') {
+            closeModal();
+          } else if (e.key === 'ArrowLeft') {
             prevBtn.click();
           } else if (e.key === 'ArrowRight') {
             nextBtn.click();
           }
-        };
+        }
         document.addEventListener('keydown', keyHandler);
-
-        modal.addEventListener('remove', () => {
-          document.removeEventListener('keydown', keyHandler);
-        });
 
         document.body.appendChild(modal);
       }
