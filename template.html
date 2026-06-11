@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes"
+    />
+    <title>照片选择工具 | 同桌照 & 小组照</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          Helvetica,
+          Arial,
+          sans-serif;
+        background: #f5f7fb;
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* 解锁面板单独处理 */
+      .lock-panel {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: white;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+
+      .lock-card {
+        background: white;
+        border-radius: 32px;
+        box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.1);
+        padding: 32px 24px;
+        max-width: 400px;
+        width: 100%;
+        text-align: center;
+      }
+
+      .lock-card h2 {
+        margin-top: 0;
+      }
+      .password-input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin: 20px 0;
+      }
+      #passwordInput {
+        width: 100%;
+        padding: 14px 20px;
+        border-radius: 60px;
+        border: 1px solid #cbd5e1;
+        font-size: 1rem;
+        text-align: center;
+      }
+      #unlockBtn {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 14px 32px;
+        border-radius: 60px;
+        font-weight: 600;
+        font-size: 1.05rem;
+        cursor: pointer;
+        align-self: center;
+        min-width: 140px;
+      }
+      .error-msg {
+        color: #dc2626;
+        font-size: 0.85rem;
+        margin-top: 8px;
+      }
+
+      /* 主应用结构（解密后可见） */
+      .app-container {
+        display: none;
+        flex-direction: column;
+        height: 100vh;
+        background: #f8fafc;
+      }
+
+      /* 固定顶部区域 */
+      .sticky-header {
+        position: sticky;
+        top: 0;
+        background: #ffffffdd;
+        backdrop-filter: blur(20px);
+        background: white;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 12px 16px;
+        z-index: 10;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+      }
+
+      .tab-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .tab-btn {
+        flex: 1;
+        background: #f1f5f9;
+        border: none;
+        padding: 10px 0;
+        border-radius: 40px;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: 0.2s;
+        color: #475569;
+      }
+      .tab-btn.active {
+        background: #3b82f6;
+        color: white;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+      }
+      .info-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .selection-info {
+        background: #eef2ff;
+        padding: 6px 14px;
+        border-radius: 40px;
+        font-size: 0.85rem;
+        font-weight: 500;
+      }
+      .confirm-btn {
+        background: #0f172a;
+        color: white;
+        border: none;
+        padding: 8px 24px;
+        border-radius: 40px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .confirm-btn:active {
+        transform: scale(0.96);
+        background: #1e293b;
+      }
+
+      /* 滚动内容区 */
+      .scroll-area {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+      }
+
+      /* 卡片样式（用于选择下拉和照片网格） */
+      .select-card {
+        background: white;
+        border-radius: 24px;
+        padding: 16px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+      }
+      .select-card label {
+        font-weight: 600;
+        display: block;
+        margin-bottom: 8px;
+      }
+      select {
+        width: 100%;
+        padding: 12px;
+        border-radius: 20px;
+        border: 1px solid #cbd5e1;
+        background: white;
+        font-size: 0.95rem;
+      }
+
+      .photo-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 14px;
+        margin-top: 12px;
+      }
+      .photo-item {
+        background: white;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        border: 2px solid transparent;
+        transition: 0.1s;
+        position: relative;
+      }
+      .photo-item.selected {
+        border-color: #3b82f6;
+        background: #eff6ff;
+      }
+      .photo-img-wrapper {
+        position: relative;
+        cursor: pointer;
+      }
+      .photo-img-wrapper img {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        object-fit: cover;
+        display: block;
+        background: #e2e8f0;
+      }
+      .zoom-icon {
+        position: absolute;
+        bottom: 6px;
+        right: 6px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 30px;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 16px;
+        backdrop-filter: blur(4px);
+        cursor: pointer;
+        z-index: 2;
+      }
+      .photo-id {
+        padding: 8px 8px 10px;
+        font-size: 0.7rem;
+        font-weight: 500;
+        text-align: center;
+        background: white;
+        color: #334155;
+      }
+      .badge-check {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        background: #3b82f6;
+        color: white;
+        border-radius: 30px;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+      .result-area {
+        background: #f1f5f9;
+        border-radius: 20px;
+        padding: 12px;
+        margin-top: 20px;
+        font-family: monospace;
+        font-size: 0.8rem;
+        white-space: pre-wrap;
+        word-break: break-all;
+        border-left: 4px solid #3b82f6;
+        display: none;
+      }
+      .copy-tip {
+        font-size: 0.7rem;
+        color: #10b981;
+        margin-top: 6px;
+        text-align: right;
+      }
+      .empty-tip {
+        text-align: center;
+        padding: 40px 20px;
+        color: #94a3b8;
+      }
+      @media (max-width: 500px) {
+        .photo-grid {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+        }
+        .sticky-header {
+          padding: 10px 12px;
+        }
+      }
+      footer {
+        text-align: center;
+        font-size: 0.7rem;
+        color: #94a3b8;
+        padding: 16px;
+      }
+      button {
+        background: none;
+        border: none;
+      }
+
+      /* 确认弹窗样式 */
+      .confirm-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+      }
+      .confirm-modal-content {
+        background: white;
+        border-radius: 24px;
+        padding: 24px;
+        max-width: 340px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        animation: modalPop 0.3s ease;
+      }
+      @keyframes modalPop {
+        from {
+          transform: scale(0.8);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .confirm-modal-title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+        color: #10b981;
+      }
+      .confirm-modal-text {
+        font-size: 0.9rem;
+        color: #475569;
+        line-height: 1.6;
+        margin-bottom: 16px;
+      }
+      .confirm-modal-output {
+        background: #f1f5f9;
+        border-radius: 12px;
+        padding: 12px;
+        font-family: monospace;
+        font-size: 0.75rem;
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin-bottom: 16px;
+        max-height: 150px;
+        overflow-y: auto;
+        border-left: 3px solid #10b981;
+      }
+      .confirm-modal-btn {
+        background: #10b981;
+        color: white;
+        border: none;
+        padding: 10px 28px;
+        border-radius: 40px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+      }
+      .confirm-modal-btn:active {
+        transform: scale(0.96);
+      }
+      .confirm-modal-fail-tip {
+        font-size: 0.75rem;
+        color: #f59e0b;
+        margin-top: 12px;
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  </head>
+  <body>
+    <!-- 解锁面板 -->
+    <div class="lock-panel" id="lockPanel">
+      <div class="lock-card">
+        <h2>🔐 加密相册</h2>
+        <p>请输入访问密码</p>
+        <div class="password-input-group">
+          <input
+            type="password"
+            id="passwordInput"
+            placeholder="密码"
+            autocomplete="off"
+          />
+          <button id="unlockBtn">解锁</button>
+        </div>
+        <div id="lockError" class="error-msg"></div>
+      </div>
+    </div>
+
+    <!-- 主应用 -->
+    <div id="appContainer" class="app-container">
+      <div class="sticky-header">
+        <div class="tab-bar">
+          <button class="tab-btn active" data-tab="partner">👥 同桌照</button>
+          <button class="tab-btn" data-tab="group">🧑‍🤝‍🧑 小组照</button>
+        </div>
+        <div class="info-bar">
+          <div class="selection-info" id="selectionInfo">未选择</div>
+          <button class="confirm-btn" id="confirmBtn">✅ 确认 & 复制</button>
+        </div>
+      </div>
+
+      <div class="scroll-area">
+        <!-- 同桌照面板 -->
+        <div id="partnerPanel" class="tab-panel">
+          <div class="select-card">
+            <label>📌 选择同桌组合</label>
+            <select id="partnerSelect"></select>
+          </div>
+          <div id="partnerPhotosGrid" class="photo-grid"></div>
+          <div id="partnerResult" class="result-area"></div>
+          <div id="partnerCopyTip" class="copy-tip"></div>
+        </div>
+
+        <!-- 小组照面板 -->
+        <div id="groupPanel" class="tab-panel" style="display: none">
+          <div class="select-card">
+            <label>📌 选择小组</label>
+            <select id="groupSelect"></select>
+          </div>
+          <div id="groupPhotosGrid" class="photo-grid"></div>
+          <div id="groupResult" class="result-area"></div>
+          <div id="groupCopyTip" class="copy-tip"></div>
+        </div>
+        <footer>🔍 点击图片选择 | 点击放大镜图标查看大图</footer>
+      </div>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="confirm-modal" id="confirmModal">
+      <div class="confirm-modal-content">
+        <div class="confirm-modal-title">✅ 已复制成功！</div>
+        <div class="confirm-modal-text">
+          选中的图片已复制到剪贴板，请填写到接龙中。
+        </div>
+        <div class="confirm-modal-output" id="modalOutput"></div>
+        <button class="confirm-modal-btn" id="modalCloseBtn">知道了</button>
+        <div class="confirm-modal-fail-tip" id="modalFailTip" style="display: none;">
+          ⚠️ 如自动复制失败，请手动复制上方内容
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <script>
+      // ================= 加密数据占位符（构建时自动替换）=================
+      const ENCRYPTED_DATA = 'ENCRYPTED_DATA_PLACEHOLDER'; // 构建脚本替换此占位符
+      // ================================================================
+
+      let appData = null;
+      let partnerPhotos = []; // AlbumType == "4"
+      let groupPhotos = []; // AlbumType == "2"
+
+      // 状态
+      let selectedPartnerPhotoId = null;
+      let selectedGroupPhotoIds = new Set();
+
+      // DOM 元素
+      const lockPanel = document.getElementById('lockPanel');
+      const appContainer = document.getElementById('appContainer');
+      const passwordInput = document.getElementById('passwordInput');
+      const unlockBtn = document.getElementById('unlockBtn');
+      const lockError = document.getElementById('lockError');
+      const partnerSelect = document.getElementById('partnerSelect');
+      const groupSelect = document.getElementById('groupSelect');
+      const partnerPhotosDiv = document.getElementById('partnerPhotosGrid');
+      const groupPhotosDiv = document.getElementById('groupPhotosGrid');
+      const partnerResultDiv = document.getElementById('partnerResult');
+      const groupResultDiv = document.getElementById('groupResult');
+      const partnerCopyTipSpan = document.getElementById('partnerCopyTip');
+      const groupCopyTipSpan = document.getElementById('groupCopyTip');
+      const selectionInfo = document.getElementById('selectionInfo');
+      const confirmBtn = document.getElementById('confirmBtn');
+      const partnerPanel = document.getElementById('partnerPanel');
+      const groupPanel = document.getElementById('groupPanel');
+      const tabBtns = document.querySelectorAll('.tab-btn');
+
+      let currentTab = 'partner'; // 'partner' or 'group'
+
+      // ==================== localStorage 相关 ====================
+      const STORAGE_KEY = 'zhuanjiao_selections';
+
+      function saveToStorage() {
+        const data = {
+          partnerSelect: partnerSelect.value,
+          selectedPartnerPhotoId: selectedPartnerPhotoId,
+          groupSelect: groupSelect.value,
+          selectedGroupPhotoIds: Array.from(selectedGroupPhotoIds),
+          timestamp: Date.now()
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      }
+
+      function loadFromStorage() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return null;
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function clearStorage() {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+
+      // 验证保存的照片ID是否在当前数据中存在（防止数据更新后显示无效ID）
+      function validatePhotoId(photoId, photos) {
+        return photos.some(p => p.OrderAlbumID === photoId);
+      }
+
+      function validatePhotoIds(photoIds, photos) {
+        return photoIds.filter(id => validatePhotoId(id, photos));
+      }
+      // ============================================================
+
+      // 辅助：复制到剪贴板
+      async function copyToClipboard(text, tipElement, resultElement) {
+        try {
+          await navigator.clipboard.writeText(text);
+          if (tipElement) tipElement.innerText = '✅ 已复制到剪贴板！';
+          setTimeout(() => {
+            if (tipElement) tipElement.innerText = '';
+          }, 2000);
+        } catch (err) {
+          if (resultElement) {
+            resultElement.style.display = 'block';
+            const range = document.createRange();
+            const selection = window.getSelection();
+            range.selectNodeContents(resultElement);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            if (tipElement)
+              tipElement.innerText = '⚠️ 复制失败，请手动选中上方文本';
+          } else {
+            alert('复制失败，请手动复制');
+          }
+        }
+      }
+
+      // 查看大图
+      function showBigImage(url) {
+        const modal = document.createElement('div');
+        modal.style.position = 'fixed';
+        modal.style.top = 0;
+        modal.style.left = 0;
+        modal.style.width = '100%';
+        modal.style.height = '100%';
+        modal.style.backgroundColor = 'rgba(0,0,0,0.9)';
+        modal.style.display = 'flex';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.zIndex = 9999;
+        modal.style.cursor = 'pointer';
+        const img = document.createElement('img');
+        img.src = url;
+        img.style.maxWidth = '95%';
+        img.style.maxHeight = '95%';
+        img.style.borderRadius = '12px';
+        modal.appendChild(img);
+        modal.onclick = () => modal.remove();
+        document.body.appendChild(modal);
+      }
+
+      // 渲染同桌照
+      function renderPartnerPhotos() {
+        if (!partnerPhotos.length) {
+          partnerPhotosDiv.innerHTML =
+            '<div class="empty-tip">暂无同桌照 (AlbumType="4")</div>';
+          return;
+        }
+        let html = '';
+        partnerPhotos.forEach((photo) => {
+          const isSelected = selectedPartnerPhotoId === photo.OrderAlbumID;
+          html += `
+                <div class="photo-item ${isSelected ? 'selected' : ''}" data-id="${photo.OrderAlbumID}">
+                    <div class="photo-img-wrapper" data-select-id="${photo.OrderAlbumID}">
+                        <img src="${photo.SmallPath}" alt="缩略图" loading="lazy">
+                        <div class="zoom-icon" data-big="${photo.DownPhotoPic}">🔍</div>
+                    </div>
+                    <div class="photo-id">ID: ${photo.OrderAlbumID}</div>
+                    ${isSelected ? '<div class="badge-check">✓</div>' : ''}
+                </div>
+            `;
+        });
+        partnerPhotosDiv.innerHTML = html;
+
+        // 绑定选择事件（点击图片区域）
+        document
+          .querySelectorAll(
+            '#partnerPhotosGrid .photo-img-wrapper[data-select-id]',
+          )
+          .forEach((wrapper) => {
+            wrapper.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const photoId = parseInt(wrapper.dataset.selectId);
+              selectPartnerPhoto(photoId);
+            });
+          });
+        // 绑定放大镜事件
+        document
+          .querySelectorAll('#partnerPhotosGrid .zoom-icon')
+          .forEach((zoom) => {
+            zoom.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const bigUrl = zoom.dataset.big;
+              if (bigUrl) showBigImage(bigUrl);
+            });
+          });
+      }
+
+      function selectPartnerPhoto(photoId) {
+        if (selectedPartnerPhotoId === photoId) {
+          selectedPartnerPhotoId = null;
+        } else {
+          selectedPartnerPhotoId = photoId;
+        }
+        renderPartnerPhotos();
+        updateSelectionInfo();
+        partnerResultDiv.style.display = 'none';
+        partnerCopyTipSpan.innerText = '';
+        saveToStorage(); // 保存到 localStorage
+      }
+
+      // 渲染小组照
+      function renderGroupPhotos() {
+        if (!groupPhotos.length) {
+          groupPhotosDiv.innerHTML =
+            '<div class="empty-tip">暂无小组照 (AlbumType="2")</div>';
+          return;
+        }
+        let html = '';
+        groupPhotos.forEach((photo) => {
+          const isSelected = selectedGroupPhotoIds.has(photo.OrderAlbumID);
+          html += `
+                <div class="photo-item ${isSelected ? 'selected' : ''}" data-id="${photo.OrderAlbumID}">
+                    <div class="photo-img-wrapper" data-select-id="${photo.OrderAlbumID}">
+                        <img src="${photo.SmallPath}" alt="缩略图" loading="lazy">
+                        <div class="zoom-icon" data-big="${photo.DownPhotoPic}">🔍</div>
+                    </div>
+                    <div class="photo-id">ID: ${photo.OrderAlbumID}</div>
+                    ${isSelected ? '<div class="badge-check">✓</div>' : ''}
+                </div>
+            `;
+        });
+        groupPhotosDiv.innerHTML = html;
+
+        document
+          .querySelectorAll(
+            '#groupPhotosGrid .photo-img-wrapper[data-select-id]',
+          )
+          .forEach((wrapper) => {
+            wrapper.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const photoId = parseInt(wrapper.dataset.selectId);
+              toggleGroupPhoto(photoId);
+            });
+          });
+        document
+          .querySelectorAll('#groupPhotosGrid .zoom-icon')
+          .forEach((zoom) => {
+            zoom.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const bigUrl = zoom.dataset.big;
+              if (bigUrl) showBigImage(bigUrl);
+            });
+          });
+      }
+
+      function toggleGroupPhoto(photoId) {
+        if (selectedGroupPhotoIds.has(photoId)) {
+          selectedGroupPhotoIds.delete(photoId);
+        } else {
+          if (selectedGroupPhotoIds.size >= 12) {
+            alert('小组照最多只能选择 12 张！');
+            return;
+          }
+          selectedGroupPhotoIds.add(photoId);
+        }
+        renderGroupPhotos();
+        updateSelectionInfo();
+        groupResultDiv.style.display = 'none';
+        groupCopyTipSpan.innerText = '';
+        saveToStorage(); // 保存到 localStorage
+      }
+
+      function updateSelectionInfo() {
+        if (currentTab === 'partner') {
+          const selectedPartner = partnerSelect.value || '未选择同桌';
+          if (selectedPartnerPhotoId) {
+            selectionInfo.innerText = `${selectedPartner} | 已选 1 张 (ID: ${selectedPartnerPhotoId})`;
+            selectionInfo.style.background = '#d1fae5';
+          } else {
+            selectionInfo.innerText = `${selectedPartner} | 未选择照片 (0/1)`;
+            selectionInfo.style.background = '#eef2ff';
+          }
+        } else {
+          const selectedGroup = groupSelect.value || '未选择小组';
+          const count = selectedGroupPhotoIds.size;
+          selectionInfo.innerText = `${selectedGroup} | 已选 ${count}/12 张`;
+          if (count === 12) selectionInfo.style.background = '#d1fae5';
+          else selectionInfo.style.background = '#eef2ff';
+        }
+      }
+
+      // 确认当前 Tab 的选择
+      async function confirmCurrentTab() {
+        let outputText = '';
+
+        if (currentTab === 'partner') {
+          const selectedPartner = partnerSelect.value;
+          if (!selectedPartner) {
+            alert('请先选择一对同桌');
+            return;
+          }
+          if (!selectedPartnerPhotoId) {
+            alert('请先选择一张同桌照');
+            return;
+          }
+          outputText = `${selectedPartner}:\n  - ${selectedPartnerPhotoId}`;
+        } else {
+          // 小组照
+          const selectedGroup = groupSelect.value;
+          if (!selectedGroup) {
+            alert('请先选择一个小组');
+            return;
+          }
+          if (selectedGroupPhotoIds.size === 0) {
+            alert('请至少选择一张小组照');
+            return;
+          }
+          if (selectedGroupPhotoIds.size !== 12) {
+            alert(`小组照必须选择12张！当前已选 ${selectedGroupPhotoIds.size} 张，请继续选择。`);
+            return;
+          }
+          const ids = Array.from(selectedGroupPhotoIds).sort((a, b) => a - b);
+          outputText = `${selectedGroup}:\n`;
+          ids.forEach((id) => {
+            outputText += `  - ${id}\n`;
+          });
+          outputText = outputText.trim();
+        }
+
+        // 尝试复制到剪贴板
+        let copySuccess = false;
+        try {
+          await navigator.clipboard.writeText(outputText);
+          copySuccess = true;
+        } catch (err) {
+          copySuccess = false;
+        }
+
+        // 显示弹窗
+        const modal = document.getElementById('confirmModal');
+        const modalOutput = document.getElementById('modalOutput');
+        const modalFailTip = document.getElementById('modalFailTip');
+
+        modalOutput.innerText = outputText;
+        if (copySuccess) {
+          modalFailTip.style.display = 'none';
+        } else {
+          modalFailTip.style.display = 'block';
+        }
+        modal.style.display = 'flex';
+      }
+
+      // 切换 Tab
+      function switchTab(tab) {
+        currentTab = tab;
+        if (tab === 'partner') {
+          partnerPanel.style.display = 'block';
+          groupPanel.style.display = 'none';
+          updateSelectionInfo();
+        } else {
+          partnerPanel.style.display = 'none';
+          groupPanel.style.display = 'block';
+          updateSelectionInfo();
+        }
+        // 高亮按钮
+        tabBtns.forEach((btn) => {
+          if (btn.dataset.tab === tab) btn.classList.add('active');
+          else btn.classList.remove('active');
+        });
+      }
+
+      // 初始化数据
+      function initApp(data) {
+        appData = data;
+        partnerPhotos = data.AlbumList.filter((p) => p.AlbumType === '4');
+        groupPhotos = data.AlbumList.filter((p) => p.AlbumType === '2');
+
+        // 填充下拉框
+        partnerSelect.innerHTML = '<option value="">-- 请选择同桌 --</option>';
+        data.PartnerList.forEach((p) => {
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = p;
+          partnerSelect.appendChild(opt);
+        });
+        groupSelect.innerHTML = '<option value="">-- 请选择小组 --</option>';
+        data.GroupList.forEach((g) => {
+          const opt = document.createElement('option');
+          opt.value = g;
+          opt.textContent = g;
+          groupSelect.appendChild(opt);
+        });
+
+        // 从 localStorage 恢复状态
+        const saved = loadFromStorage();
+        if (saved) {
+          // 恢复同桌选择（验证有效性）
+          if (saved.partnerSelect && data.PartnerList.includes(saved.partnerSelect)) {
+            partnerSelect.value = saved.partnerSelect;
+          }
+          // 恢复同桌照ID（验证有效性）
+          if (saved.selectedPartnerPhotoId && validatePhotoId(saved.selectedPartnerPhotoId, partnerPhotos)) {
+            selectedPartnerPhotoId = saved.selectedPartnerPhotoId;
+          } else {
+            selectedPartnerPhotoId = null;
+          }
+          // 恢复小组选择（验证有效性）
+          if (saved.groupSelect && data.GroupList.includes(saved.groupSelect)) {
+            groupSelect.value = saved.groupSelect;
+          }
+          // 恢复小组照ID（验证有效性）
+          if (saved.selectedGroupPhotoIds && Array.isArray(saved.selectedGroupPhotoIds)) {
+            const validIds = validatePhotoIds(saved.selectedGroupPhotoIds, groupPhotos);
+            selectedGroupPhotoIds = new Set(validIds);
+          } else {
+            selectedGroupPhotoIds = new Set();
+          }
+        } else {
+          selectedPartnerPhotoId = null;
+          selectedGroupPhotoIds = new Set();
+        }
+
+        renderPartnerPhotos();
+        renderGroupPhotos();
+        switchTab('partner');
+      }
+
+      // 解密逻辑
+      function decryptAndLoad(password) {
+        try {
+          const decrypted = CryptoJS.AES.decrypt(
+            ENCRYPTED_DATA.trim(),
+            password,
+          );
+          const plainText = decrypted.toString(CryptoJS.enc.Utf8);
+          if (!plainText) throw new Error();
+          const jsonData = JSON.parse(plainText);
+          if (
+            !jsonData.PartnerList ||
+            !jsonData.GroupList ||
+            !jsonData.AlbumList
+          )
+            throw new Error();
+          initApp(jsonData);
+          lockPanel.style.display = 'none';
+          appContainer.style.display = 'flex';
+        } catch (e) {
+          lockError.innerText = '密码错误或数据损坏';
+        }
+      }
+
+      unlockBtn.addEventListener('click', () => {
+        const pwd = passwordInput.value;
+        if (!pwd) {
+          lockError.innerText = '请输入密码';
+          return;
+        }
+        decryptAndLoad(pwd);
+      });
+      passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') unlockBtn.click();
+      });
+
+      confirmBtn.addEventListener('click', confirmCurrentTab);
+
+      // 监听下拉框变化，更新顶部显示并保存
+      partnerSelect.addEventListener('change', () => {
+        updateSelectionInfo();
+        saveToStorage();
+      });
+      groupSelect.addEventListener('change', () => {
+        updateSelectionInfo();
+        saveToStorage();
+      });
+
+      // 弹窗关闭按钮
+      document.getElementById('modalCloseBtn').addEventListener('click', () => {
+        document.getElementById('confirmModal').style.display = 'none';
+      });
+
+      // 点击弹窗外部也可以关闭
+      document.getElementById('confirmModal').addEventListener('click', (e) => {
+        if (e.target.id === 'confirmModal') {
+          e.target.style.display = 'none';
+        }
+      });
+
+      tabBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          switchTab(btn.dataset.tab);
+        });
+      });
+
+      // 若占位符未被构建替换，提示
+      if (ENCRYPTED_DATA === 'ENCRYPTED_DATA_PLACEHOLDER') {
+        lockError.innerText = '⚠️ 请先运行构建脚本 (npm run build) 加密数据';
+      }
+    </script>
+  </body>
+</html>

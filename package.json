@@ -1,0 +1,12 @@
+{
+  "name": "photo-selector-encrypt",
+  "version": "1.0.0",
+  "description": "加密照片数据并生成最终HTML",
+  "main": "build.js",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "crypto-js": "^4.2.0"
+  }
+}
