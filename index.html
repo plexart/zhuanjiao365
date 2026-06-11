@@ -614,6 +614,15 @@
 
       // ==================== localStorage 相关 ====================
       const STORAGE_KEY = 'zhuanjiao_selections';
+      const PASSWORD_KEY = 'zhuanjiao_password';
+
+      function savePassword(pwd) {
+        localStorage.setItem(PASSWORD_KEY, pwd);
+      }
+
+      function getSavedPassword() {
+        return localStorage.getItem(PASSWORD_KEY);
+      }
 
       function saveToStorage() {
         const data = {
@@ -1027,7 +1036,7 @@
       }
 
       // 解密逻辑
-      function decryptAndLoad(password) {
+      function decryptAndLoad(password, savePwd = false) {
         try {
           const decrypted = CryptoJS.AES.decrypt(
             window.ENCRYPTED_DATA.trim(),
@@ -1042,11 +1051,17 @@
             !jsonData.AlbumList
           )
             throw new Error();
+          // 密码正确，保存密码
+          if (savePwd) {
+            savePassword(password);
+          }
           initApp(jsonData);
           lockPanel.style.display = 'none';
           appContainer.style.display = 'flex';
+          return true;
         } catch (e) {
           lockError.innerText = '密码错误或数据损坏';
+          return false;
         }
       }
 
@@ -1056,7 +1071,7 @@
           lockError.innerText = '请输入密码';
           return;
         }
-        decryptAndLoad(pwd);
+        decryptAndLoad(pwd, true);
       });
       passwordInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') unlockBtn.click();
@@ -1107,6 +1122,19 @@
       // 若加密数据未加载，提示
       if (!window.ENCRYPTED_DATA) {
         lockError.innerText = '⚠️ 请先运行构建脚本 (npm run build) 加密数据';
+      } else {
+        // 尝试使用保存的密码自动解锁
+        const savedPwd = getSavedPassword();
+        if (savedPwd) {
+          passwordInput.value = savedPwd;
+          if (decryptAndLoad(savedPwd)) {
+            // 密码正确，已解锁，不需要return
+          } else {
+            // 保存的密码不对，清空并让用户重新输入
+            passwordInput.value = '';
+            localStorage.removeItem(PASSWORD_KEY);
+          }
+        }
       }
     </script>
   </body>
