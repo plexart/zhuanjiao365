@@ -699,26 +699,297 @@
       }
 
       // 查看大图
-      function showBigImage(url) {
+      function showBigImage(url, photoId, isGroup = false) {
         const modal = document.createElement('div');
         modal.style.position = 'fixed';
         modal.style.top = 0;
         modal.style.left = 0;
         modal.style.width = '100%';
         modal.style.height = '100%';
-        modal.style.backgroundColor = 'rgba(0,0,0,0.9)';
+        modal.style.backgroundColor = 'rgba(0,0,0,0.95)';
         modal.style.display = 'flex';
         modal.style.alignItems = 'center';
         modal.style.justifyContent = 'center';
         modal.style.zIndex = 9999;
-        modal.style.cursor = 'pointer';
+        modal.style.overflow = 'hidden';
+
+        // 获取当前照片列表和索引
+        const photos = isGroup ? groupPhotos : partnerPhotos;
+        let currentIndex = photos.findIndex(p => p.DownPhotoPic === url);
+
+        // 创建图片容器
+        const imgContainer = document.createElement('div');
+        imgContainer.style.position = 'relative';
+        imgContainer.style.maxWidth = '95%';
+        imgContainer.style.maxHeight = '95%';
+        imgContainer.style.display = 'flex';
+        imgContainer.style.alignItems = 'center';
+        imgContainer.style.justifyContent = 'center';
+
         const img = document.createElement('img');
         img.src = url;
-        img.style.maxWidth = '95%';
-        img.style.maxHeight = '95%';
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '90vh';
         img.style.borderRadius = '12px';
-        modal.appendChild(img);
-        modal.onclick = () => modal.remove();
+        img.style.transition = 'transform 0.2s ease';
+        img.style.cursor = 'grab';
+        let scale = 1;
+        let isDragging = false;
+        let startX, startY, translateX = 0, translateY = 0;
+
+        img.addEventListener('mousedown', (e) => {
+          if (scale > 1) {
+            isDragging = true;
+            startX = e.clientX - translateX;
+            startY = e.clientY - translateY;
+            img.style.cursor = 'grabbing';
+            e.preventDefault();
+          }
+        });
+
+        img.addEventListener('mousemove', (e) => {
+          if (isDragging) {
+            translateX = e.clientX - startX;
+            translateY = e.clientY - startY;
+            updateTransform();
+          }
+        });
+
+        img.addEventListener('mouseup', () => {
+          isDragging = false;
+          img.style.cursor = scale > 1 ? 'grab' : 'grab';
+        });
+
+        img.addEventListener('mouseleave', () => {
+          isDragging = false;
+          img.style.cursor = scale > 1 ? 'grab' : 'grab';
+        });
+
+        // 滚轮缩放
+        img.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          const delta = e.deltaY > 0 ? 0.9 : 1.1;
+          scale *= delta;
+          scale = Math.min(Math.max(0.5, scale), 4);
+          updateTransform();
+        });
+
+        // 双击缩放
+        img.addEventListener('dblclick', (e) => {
+          if (scale === 1) {
+            scale = 2;
+          } else {
+            scale = 1;
+            translateX = 0;
+            translateY = 0;
+          }
+          updateTransform();
+        });
+
+        function updateTransform() {
+          img.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+        }
+
+        // 触摸手势支持（左右滑动切换图片）
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+
+        modal.addEventListener('touchstart', (e) => {
+          touchStartX = e.changedTouches[0].screenX;
+          touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        modal.addEventListener('touchend', (e) => {
+          touchEndX = e.changedTouches[0].screenX;
+          touchEndY = e.changedTouches[0].screenY;
+          handleSwipeGesture();
+        }, { passive: true });
+
+        function handleSwipeGesture() {
+          const deltaX = touchEndX - touchStartX;
+          const deltaY = touchEndY - touchStartY;
+          const minSwipeDistance = 50;
+
+          // 确保水平滑动距离大于垂直滑动距离
+          if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
+            if (deltaX > 0) {
+              // 向右滑动 -> 上一张
+              prevBtn.click();
+            } else {
+              // 向左滑动 -> 下一张
+              nextBtn.click();
+            }
+          }
+        }
+
+        imgContainer.appendChild(img);
+
+        // 创建圆形按钮函数（类似选择框）
+        function createCircleBtn(content, onClick, isSelected = false) {
+          const btn = document.createElement('button');
+          if (isSelected) {
+            // 选择框样式
+            btn.className = 'select-checkbox checked';
+            btn.style.position = 'absolute';
+            btn.style.top = '20px';
+            btn.style.left = '20px';
+            btn.textContent = content;
+          } else {
+            // 关闭按钮样式
+            btn.style.background = 'rgba(0, 0, 0, 0.3)';
+            btn.style.color = 'white';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '30px';
+            btn.style.width = '24px';
+            btn.style.height = '24px';
+            btn.style.display = 'flex';
+            btn.style.alignItems = 'center';
+            btn.style.justifyContent = 'center';
+            btn.style.cursor = 'pointer';
+            btn.style.fontSize = '14px';
+            btn.style.fontWeight = 'bold';
+            btn.style.position = 'absolute';
+            btn.style.top = '20px';
+            btn.style.right = '20px';
+            btn.textContent = content;
+          }
+          btn.addEventListener('click', onClick);
+          return btn;
+        }
+
+        // 上一张按钮（左侧箭头）
+        const prevBtn = document.createElement('button');
+        prevBtn.innerHTML = '<svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M20 6L12 16L20 26" stroke="rgba(0,0,0,0.5)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        prevBtn.style.background = 'transparent';
+        prevBtn.style.border = 'none';
+        prevBtn.style.width = '44px';
+        prevBtn.style.height = '44px';
+        prevBtn.style.display = 'flex';
+        prevBtn.style.alignItems = 'center';
+        prevBtn.style.justifyContent = 'center';
+        prevBtn.style.cursor = 'pointer';
+        prevBtn.style.position = 'absolute';
+        prevBtn.style.left = '5px';
+        prevBtn.style.top = '50%';
+        prevBtn.style.transform = 'translateY(-50%)';
+        prevBtn.style.padding = '0';
+        prevBtn.addEventListener('click', () => {
+          if (currentIndex > 0) {
+            currentIndex--;
+            const newPhoto = photos[currentIndex];
+            img.src = newPhoto.DownPhotoPic;
+            scale = 1;
+            translateX = 0;
+            translateY = 0;
+            updateTransform();
+            updateSelectBtn();
+          }
+        });
+
+        // 下一张按钮（右侧箭头）
+        const nextBtn = document.createElement('button');
+        nextBtn.innerHTML = '<svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M12 6L20 16L12 26" stroke="rgba(0,0,0,0.5)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        nextBtn.style.background = 'transparent';
+        nextBtn.style.border = 'none';
+        nextBtn.style.width = '44px';
+        nextBtn.style.height = '44px';
+        nextBtn.style.display = 'flex';
+        nextBtn.style.alignItems = 'center';
+        nextBtn.style.justifyContent = 'center';
+        nextBtn.style.cursor = 'pointer';
+        nextBtn.style.position = 'absolute';
+        nextBtn.style.right = '5px';
+        nextBtn.style.top = '50%';
+        nextBtn.style.transform = 'translateY(-50%)';
+        nextBtn.style.padding = '0';
+        nextBtn.addEventListener('click', () => {
+          if (currentIndex < photos.length - 1) {
+            currentIndex++;
+            const newPhoto = photos[currentIndex];
+            img.src = newPhoto.DownPhotoPic;
+            scale = 1;
+            translateX = 0;
+            translateY = 0;
+            updateTransform();
+            updateSelectBtn();
+          }
+        });
+
+        // 选择/反选按钮（圆形，类似列表页）
+        const selectBtn = createCircleBtn('', () => {
+          const currentPhoto = photos[currentIndex];
+          const id = currentPhoto.OrderAlbumID;
+          if (isGroup) {
+            toggleGroupPhoto(id);
+          } else {
+            selectPartnerPhoto(id);
+          }
+          updateSelectBtn();
+        }, true);
+
+        function updateSelectBtn() {
+          const currentPhoto = photos[currentIndex];
+          const id = currentPhoto.OrderAlbumID;
+          let isSelected;
+          if (isGroup) {
+            isSelected = selectedGroupPhotoIds.has(id);
+          } else {
+            isSelected = selectedPartnerPhotoId === id;
+          }
+          selectBtn.textContent = isSelected ? '✓' : '';
+          if (isSelected) {
+            selectBtn.className = 'select-checkbox checked';
+          } else {
+            selectBtn.className = 'select-checkbox empty';
+          }
+        }
+
+        // 关闭按钮
+        const closeBtn = createCircleBtn('✕', () => {
+          modal.remove();
+        });
+
+        imgContainer.appendChild(prevBtn);
+        imgContainer.appendChild(nextBtn);
+        imgContainer.appendChild(selectBtn);
+        imgContainer.appendChild(closeBtn);
+        modal.appendChild(imgContainer);
+
+        // 初始化选择按钮状态
+        updateSelectBtn();
+
+        // 点击背景关闭
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            modal.remove();
+          }
+        });
+
+        // ESC关闭
+        const escHandler = (e) => {
+          if (e.key === 'Escape') {
+            modal.remove();
+            document.removeEventListener('keydown', escHandler);
+          }
+        };
+        document.addEventListener('keydown', escHandler);
+
+        // 键盘导航
+        const keyHandler = (e) => {
+          if (e.key === 'ArrowLeft') {
+            prevBtn.click();
+          } else if (e.key === 'ArrowRight') {
+            nextBtn.click();
+          }
+        };
+        document.addEventListener('keydown', keyHandler);
+
+        modal.addEventListener('remove', () => {
+          document.removeEventListener('keydown', keyHandler);
+        });
+
         document.body.appendChild(modal);
       }
 
@@ -755,7 +1026,9 @@
               if (e.target.classList.contains('select-checkbox')) return;
               e.stopPropagation();
               const bigUrl = wrapper.dataset.big;
-              if (bigUrl) showBigImage(bigUrl);
+              const photoItem = wrapper.closest('.photo-item');
+              const photoId = parseInt(photoItem.dataset.id);
+              if (bigUrl) showBigImage(bigUrl, photoId, false);
             });
           });
 
@@ -817,7 +1090,9 @@
               if (e.target.classList.contains('select-checkbox')) return;
               e.stopPropagation();
               const bigUrl = wrapper.dataset.big;
-              if (bigUrl) showBigImage(bigUrl);
+              const photoItem = wrapper.closest('.photo-item');
+              const photoId = parseInt(photoItem.dataset.id);
+              if (bigUrl) showBigImage(bigUrl, photoId, true);
             });
           });
 
