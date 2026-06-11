@@ -141,6 +141,11 @@
         gap: 12px;
         margin-bottom: 8px;
       }
+      .action-btns {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
       .selection-info {
         background: #eef2ff;
         padding: 6px 14px;
@@ -302,6 +307,25 @@
         padding: 40px 20px;
         color: #94a3b8;
       }
+      .filter-btn {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        padding: 6px 16px;
+        border-radius: 40px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .filter-btn.active {
+        background: #0f172a;
+        color: white;
+        border-color: #0f172a;
+      }
+      .filter-btn:active {
+        transform: scale(0.96);
+      }
       @media (max-width: 500px) {
         .photo-grid {
           grid-template-columns: repeat(2, 1fr);
@@ -309,6 +333,11 @@
         }
         .sticky-header {
           padding: 10px 12px;
+        }
+        /* 手机视图：过滤/确认按钮单独一行 */
+        .action-btns {
+          width: 100%;
+          justify-content: space-between;
         }
       }
       footer {
@@ -527,7 +556,10 @@
         </div>
         <div class="info-bar">
           <div class="selection-info" id="selectionInfo">未选择</div>
-          <button class="confirm-btn" id="confirmBtn">✅ 确认 & 复制</button>
+          <div class="action-btns">
+            <button class="filter-btn" id="filterBtn" type="button">只看已选</button>
+            <button class="confirm-btn" id="confirmBtn">✅ 确认 & 复制</button>
+          </div>
         </div>
       </div>
 
@@ -605,6 +637,10 @@
       let selectedPartnerPhotoId = null;
       let selectedGroupPhotoIds = new Set();
 
+      // 过滤状态（只看已选）
+      let partnerShowSelectedOnly = false;
+      let groupShowSelectedOnly = false;
+
       // DOM 元素
       const lockPanel = document.getElementById('lockPanel');
       const appContainer = document.getElementById('appContainer');
@@ -615,6 +651,7 @@
       const groupSelect = document.getElementById('groupSelect');
       const partnerPhotosDiv = document.getElementById('partnerPhotosGrid');
       const groupPhotosDiv = document.getElementById('groupPhotosGrid');
+      const filterBtn = document.getElementById('filterBtn');
       const partnerResultDiv = document.getElementById('partnerResult');
       const groupResultDiv = document.getElementById('groupResult');
       const partnerCopyTipSpan = document.getElementById('partnerCopyTip');
@@ -714,7 +751,7 @@
         modal.style.overflow = 'hidden';
 
         // 获取当前照片列表和索引
-        const photos = isGroup ? groupPhotos : partnerPhotos;
+        const photos = isGroup ? getVisibleGroupPhotos() : getVisiblePartnerPhotos();
         let currentIndex = photos.findIndex(p => p.DownPhotoPic === url);
 
         // 创建图片容器
@@ -1115,14 +1152,41 @@
       }
 
       // 渲染同桌照
+      // ==================== 过滤（只看已选） ====================
+      function getVisiblePartnerPhotos() {
+        return partnerShowSelectedOnly
+          ? partnerPhotos.filter((p) => selectedPartnerPhotoId === p.OrderAlbumID)
+          : partnerPhotos;
+      }
+
+      function getVisibleGroupPhotos() {
+        return groupShowSelectedOnly
+          ? groupPhotos.filter((p) => selectedGroupPhotoIds.has(p.OrderAlbumID))
+          : groupPhotos;
+      }
+
+      function updateFilterBtn() {
+        if (!filterBtn) return;
+        const active =
+          currentTab === 'partner' ? partnerShowSelectedOnly : groupShowSelectedOnly;
+        filterBtn.classList.toggle('active', active);
+      }
+
       function renderPartnerPhotos() {
+        updateFilterBtn();
         if (!partnerPhotos.length) {
           partnerPhotosDiv.innerHTML =
             '<div class="empty-tip">暂无同桌照 (AlbumType="4")</div>';
           return;
         }
+        const visiblePhotos = getVisiblePartnerPhotos();
+        if (!visiblePhotos.length) {
+          partnerPhotosDiv.innerHTML =
+            '<div class="empty-tip">暂无已选同桌照</div>';
+          return;
+        }
         let html = '';
-        partnerPhotos.forEach((photo) => {
+        visiblePhotos.forEach((photo) => {
           const isSelected = selectedPartnerPhotoId === photo.OrderAlbumID;
           html += `
                 <div class="photo-item ${isSelected ? 'selected' : ''}" data-id="${photo.OrderAlbumID}">
@@ -1180,13 +1244,20 @@
 
       // 渲染小组照
       function renderGroupPhotos() {
+        updateFilterBtn();
         if (!groupPhotos.length) {
           groupPhotosDiv.innerHTML =
             '<div class="empty-tip">暂无小组照 (AlbumType="2")</div>';
           return;
         }
+        const visiblePhotos = getVisibleGroupPhotos();
+        if (!visiblePhotos.length) {
+          groupPhotosDiv.innerHTML =
+            '<div class="empty-tip">暂无已选小组照</div>';
+          return;
+        }
         let html = '';
-        groupPhotos.forEach((photo) => {
+        visiblePhotos.forEach((photo) => {
           const isSelected = selectedGroupPhotoIds.has(photo.OrderAlbumID);
           html += `
                 <div class="photo-item ${isSelected ? 'selected' : ''}" data-id="${photo.OrderAlbumID}">
@@ -1394,6 +1465,8 @@
           if (btn.dataset.tab === tab) btn.classList.add('active');
           else btn.classList.remove('active');
         });
+        // 同步过滤按钮状态到当前标签页
+        updateFilterBtn();
       }
 
       // 初始化数据
@@ -1520,6 +1593,17 @@
 
       // 合并按钮
       document.getElementById('mergeBtn').addEventListener('click', openMergeModal);
+
+      // 过滤按钮（置顶）：只看当前标签页已选
+      filterBtn.addEventListener('click', () => {
+        if (currentTab === 'partner') {
+          partnerShowSelectedOnly = !partnerShowSelectedOnly;
+          renderPartnerPhotos();
+        } else {
+          groupShowSelectedOnly = !groupShowSelectedOnly;
+          renderGroupPhotos();
+        }
+      });
 
       // 合并弹窗
       document.getElementById('mergeCancelBtn').addEventListener('click', closeMergeModal);
