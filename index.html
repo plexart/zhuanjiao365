@@ -804,6 +804,20 @@
 
         function updateTransform() {
           img.style.transform = `scale(${scale}) translate(${translateX / scale}px, ${translateY / scale}px)`;
+          updateControlsVisibility();
+        }
+
+        // 根据缩放状态显示/隐藏控制按钮
+        function updateControlsVisibility() {
+          const isZoomed = scale > 1.1;
+          prevBtn.style.opacity = isZoomed ? '0' : '1';
+          prevBtn.style.pointerEvents = isZoomed ? 'none' : 'auto';
+          nextBtn.style.opacity = isZoomed ? '0' : '1';
+          nextBtn.style.pointerEvents = isZoomed ? 'none' : 'auto';
+          selectBtn.style.opacity = isZoomed ? '0' : '1';
+          selectBtn.style.pointerEvents = isZoomed ? 'none' : 'auto';
+          closeBtn.style.opacity = isZoomed ? '0' : '1';
+          closeBtn.style.pointerEvents = isZoomed ? 'none' : 'auto';
         }
 
         // 触摸手势支持（左右滑动切换图片、双指缩放、拖动放大图片）
@@ -902,6 +916,7 @@
             btn.style.position = 'absolute';
             btn.style.top = '20px';
             btn.style.left = '20px';
+            btn.style.transition = 'opacity 0.2s ease';
             btn.textContent = content;
           } else {
             // 关闭按钮样式
@@ -920,6 +935,7 @@
             btn.style.position = 'absolute';
             btn.style.top = '20px';
             btn.style.right = '20px';
+            btn.style.transition = 'opacity 0.2s ease';
             btn.textContent = content;
           }
           btn.addEventListener('click', onClick);
@@ -942,6 +958,7 @@
         prevBtn.style.top = '50%';
         prevBtn.style.transform = 'translateY(-50%)';
         prevBtn.style.padding = '0';
+        prevBtn.style.transition = 'opacity 0.2s ease';
         prevBtn.addEventListener('click', () => {
           if (currentIndex > 0) {
             currentIndex--;
@@ -966,6 +983,7 @@
         nextBtn.style.top = '50%';
         nextBtn.style.transform = 'translateY(-50%)';
         nextBtn.style.padding = '0';
+        nextBtn.style.transition = 'opacity 0.2s ease';
         nextBtn.addEventListener('click', () => {
           if (currentIndex < photos.length - 1) {
             currentIndex++;
