@@ -801,7 +801,7 @@
         });
 
         function updateTransform() {
-          img.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+          img.style.transform = `scale(${scale}) translate(${translateX / scale}px, ${translateY / scale}px)`;
         }
 
         // 触摸手势支持（左右滑动切换图片、双指缩放、拖动放大图片）
