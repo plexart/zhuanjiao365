@@ -3,3 +3,6 @@ node_modules/
 !/data/data.js
 !/data/*.example.json
 .env
+/models/
+.venv/
+__pycache__/

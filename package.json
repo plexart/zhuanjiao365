@@ -7,7 +7,8 @@
     "build": "node build.js",
     "sync": "node sync.js",
     "download": "node download.js",
-    "download-images": "node download-images.js"
+    "download-images": "node download-images.js",
+    "face-group": "python3 face_group.py"
   },
   "dependencies": {
     "crypto-js": "^4.2.0"
