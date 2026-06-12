@@ -525,6 +525,101 @@
         color: #10b981;
         margin-top: 12px;
       }
+
+      /* 大图控制按钮样式 */
+      .big-view-btn {
+        position: absolute;
+        z-index: 10001;
+        transition: opacity 0.2s ease, background 0.2s ease, transform 0.15s ease;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .big-view-select-btn {
+        top: 16px;
+        left: 16px;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        transition: transform 0.15s ease;
+      }
+      .big-view-select-btn:hover {
+        transform: scale(1.1);
+      }
+      .big-view-select-btn.empty {
+        background: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
+      }
+      .big-view-select-btn.checked {
+        background: #3b82f6;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.5);
+      }
+
+      .big-view-close-btn {
+        top: 16px;
+        right: 16px;
+        width: 40px;
+        height: 40px;
+        background: rgba(255, 255, 255, 0.15);
+        border: none;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: white;
+        font-size: 18px;
+      }
+      .big-view-close-btn:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: scale(1.05);
+      }
+
+      .big-view-nav-btn {
+        top: 50%;
+        transform: translateY(-50%);
+        width: 48px;
+        height: 48px;
+        background: rgba(255, 255, 255, 0.15);
+        border: none;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        padding: 0;
+      }
+      .big-view-nav-btn:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: translateY(-50%) scale(1.08);
+      }
+      .big-view-prev-btn {
+        left: 16px;
+      }
+      .big-view-next-btn {
+        right: 16px;
+      }
+
+      .big-view-photo-id {
+        position: absolute;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 14px;
+        font-weight: 500;
+        padding: 8px 16px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        z-index: 10001;
+        pointer-events: none;
+      }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
   </head>
@@ -992,52 +1087,12 @@
           const btn = document.createElement('button');
           if (isSelected) {
             // 选择框样式 - 屏幕左上角
-            btn.className = 'select-checkbox checked';
-            btn.style.position = 'absolute';
-            btn.style.top = '16px';
-            btn.style.left = '16px';
-            btn.style.transition = 'opacity 0.2s ease, transform 0.15s ease';
-            btn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3)';
-            btn.style.zIndex = '10001';
+            btn.className = 'big-view-btn big-view-select-btn empty';
             btn.textContent = content;
-            // 添加 hover 效果
-            btn.addEventListener('mouseenter', () => {
-              btn.style.transform = 'scale(1.1)';
-            });
-            btn.addEventListener('mouseleave', () => {
-              btn.style.transform = 'scale(1)';
-            });
           } else {
             // 关闭按钮样式 - 屏幕右上角
-            btn.style.background = 'rgba(255, 255, 255, 0.15)';
-            btn.style.color = 'white';
-            btn.style.border = 'none';
-            btn.style.borderRadius = '50%';
-            btn.style.width = '40px';
-            btn.style.height = '40px';
-            btn.style.display = 'flex';
-            btn.style.alignItems = 'center';
-            btn.style.justifyContent = 'center';
-            btn.style.cursor = 'pointer';
-            btn.style.fontSize = '18px';
-            btn.style.fontWeight = 'normal';
-            btn.style.position = 'absolute';
-            btn.style.top = '16px';
-            btn.style.right = '16px';
-            btn.style.transition = 'opacity 0.2s ease, background 0.2s ease, transform 0.15s ease';
-            btn.style.backdropFilter = 'blur(10px)';
-            btn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
-            btn.style.zIndex = '10001';
+            btn.className = 'big-view-btn big-view-close-btn';
             btn.textContent = content;
-            // 添加 hover 效果
-            btn.addEventListener('mouseenter', () => {
-              btn.style.background = 'rgba(255, 255, 255, 0.25)';
-              btn.style.transform = 'scale(1.05)';
-            });
-            btn.addEventListener('mouseleave', () => {
-              btn.style.background = 'rgba(255, 255, 255, 0.15)';
-              btn.style.transform = 'scale(1)';
-            });
           }
           btn.addEventListener('click', onClick);
           return btn;
@@ -1045,34 +1100,8 @@
 
         // 上一张按钮（屏幕左侧）
         const prevBtn = document.createElement('button');
+        prevBtn.className = 'big-view-btn big-view-nav-btn big-view-prev-btn';
         prevBtn.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M17 5L10 14L17 23" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        prevBtn.style.background = 'rgba(255, 255, 255, 0.15)';
-        prevBtn.style.border = 'none';
-        prevBtn.style.borderRadius = '50%';
-        prevBtn.style.width = '48px';
-        prevBtn.style.height = '48px';
-        prevBtn.style.display = 'flex';
-        prevBtn.style.alignItems = 'center';
-        prevBtn.style.justifyContent = 'center';
-        prevBtn.style.cursor = 'pointer';
-        prevBtn.style.position = 'absolute';
-        prevBtn.style.left = '16px';
-        prevBtn.style.top = '50%';
-        prevBtn.style.transform = 'translateY(-50%)';
-        prevBtn.style.padding = '0';
-        prevBtn.style.transition = 'opacity 0.2s ease, background 0.2s ease, transform 0.15s ease';
-        prevBtn.style.backdropFilter = 'blur(10px)';
-        prevBtn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
-        prevBtn.style.zIndex = '10001';
-        // 添加 hover 效果
-        prevBtn.addEventListener('mouseenter', () => {
-          prevBtn.style.background = 'rgba(255, 255, 255, 0.25)';
-          prevBtn.style.transform = 'translateY(-50%) scale(1.08)';
-        });
-        prevBtn.addEventListener('mouseleave', () => {
-          prevBtn.style.background = 'rgba(255, 255, 255, 0.15)';
-          prevBtn.style.transform = 'translateY(-50%) scale(1)';
-        });
         prevBtn.addEventListener('click', () => {
           if (currentIndex > 0) {
             currentIndex--;
@@ -1083,34 +1112,8 @@
 
         // 下一张按钮（屏幕右侧）
         const nextBtn = document.createElement('button');
+        nextBtn.className = 'big-view-btn big-view-nav-btn big-view-next-btn';
         nextBtn.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M11 5L18 14L11 23" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        nextBtn.style.background = 'rgba(255, 255, 255, 0.15)';
-        nextBtn.style.border = 'none';
-        nextBtn.style.borderRadius = '50%';
-        nextBtn.style.width = '48px';
-        nextBtn.style.height = '48px';
-        nextBtn.style.display = 'flex';
-        nextBtn.style.alignItems = 'center';
-        nextBtn.style.justifyContent = 'center';
-        nextBtn.style.cursor = 'pointer';
-        nextBtn.style.position = 'absolute';
-        nextBtn.style.right = '16px';
-        nextBtn.style.top = '50%';
-        nextBtn.style.transform = 'translateY(-50%)';
-        nextBtn.style.padding = '0';
-        nextBtn.style.transition = 'opacity 0.2s ease, background 0.2s ease, transform 0.15s ease';
-        nextBtn.style.backdropFilter = 'blur(10px)';
-        nextBtn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
-        nextBtn.style.zIndex = '10001';
-        // 添加 hover 效果
-        nextBtn.addEventListener('mouseenter', () => {
-          nextBtn.style.background = 'rgba(255, 255, 255, 0.25)';
-          nextBtn.style.transform = 'translateY(-50%) scale(1.08)';
-        });
-        nextBtn.addEventListener('mouseleave', () => {
-          nextBtn.style.background = 'rgba(255, 255, 255, 0.15)';
-          nextBtn.style.transform = 'translateY(-50%) scale(1)';
-        });
         nextBtn.addEventListener('click', () => {
           if (currentIndex < photos.length - 1) {
             currentIndex++;
@@ -1157,16 +1160,11 @@
           }
           selectBtn.textContent = isSelected ? '✓' : '';
           if (isSelected) {
-            selectBtn.className = 'select-checkbox checked';
-            selectBtn.style.background = '#3b82f6';
-            selectBtn.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.5)';
-            selectBtn.style.backdropFilter = 'none';
+            selectBtn.classList.remove('empty');
+            selectBtn.classList.add('checked');
           } else {
-            selectBtn.className = 'select-checkbox empty';
-            // 大图视图：未选中时也显示明显的样式
-            selectBtn.style.background = 'rgba(255, 255, 255, 0.2)';
-            selectBtn.style.boxShadow = '0 0 0 2px rgba(255, 255, 255, 0.4)';
-            selectBtn.style.backdropFilter = 'blur(10px)';
+            selectBtn.classList.remove('checked');
+            selectBtn.classList.add('empty');
           }
         }
 
@@ -1177,20 +1175,7 @@
 
         // 图片ID显示（屏幕底部）
         const photoIdDisplay = document.createElement('div');
-        photoIdDisplay.style.position = 'absolute';
-        photoIdDisplay.style.bottom = '16px';
-        photoIdDisplay.style.left = '50%';
-        photoIdDisplay.style.transform = 'translateX(-50%)';
-        photoIdDisplay.style.color = 'rgba(255, 255, 255, 0.5)';
-        photoIdDisplay.style.fontSize = '14px';
-        photoIdDisplay.style.fontWeight = '500';
-        photoIdDisplay.style.padding = '8px 16px';
-        photoIdDisplay.style.background = 'rgba(0, 0, 0, 0.3)';
-        photoIdDisplay.style.borderRadius = '20px';
-        photoIdDisplay.style.backdropFilter = 'blur(10px)';
-        photoIdDisplay.style.zIndex = '10001';
-        photoIdDisplay.style.pointerEvents = 'none';
-        // 初始化显示当前图片ID
+        photoIdDisplay.className = 'big-view-photo-id';
         const initialPhoto = photos[currentIndex];
         photoIdDisplay.textContent = `ID: ${initialPhoto.OrderAlbumID}`;
 
