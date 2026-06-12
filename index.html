@@ -633,6 +633,9 @@
       let partnerPhotos = []; // AlbumType == "4"
       let groupPhotos = []; // AlbumType == "2"
 
+      // 小组照标准数量
+      const STANDARD_GROUP_COUNT = 12;
+
       // 状态
       let selectedPartnerPhotoId = null;
       let selectedGroupPhotoIds = new Set();
@@ -1151,18 +1154,55 @@
         document.body.appendChild(modal);
       }
 
+      // 获取当前选中 partner/group 的 index
+      function getSelectedPartnerIndex() {
+        const selectedValue = partnerSelect.value;
+        if (!selectedValue) return null;
+        const index = appData.PartnerList.indexOf(selectedValue);
+        return index >= 0 ? index : null;
+      }
+
+      function getSelectedGroupIndex() {
+        const selectedValue = groupSelect.value;
+        if (!selectedValue) return null;
+        const index = appData.GroupList.indexOf(selectedValue);
+        return index >= 0 ? index : null;
+      }
+
       // 渲染同桌照
-      // ==================== 过滤（只看已选） ====================
+      // ==================== 过滤（只看已选 + BelongTo） ====================
       function getVisiblePartnerPhotos() {
-        return partnerShowSelectedOnly
-          ? partnerPhotos.filter((p) => selectedPartnerPhotoId === p.OrderAlbumID)
-          : partnerPhotos;
+        const belongToIndex = getSelectedPartnerIndex();
+        let photos = partnerPhotos;
+
+        // 根据 BelongTo 过滤
+        if (belongToIndex !== null) {
+          photos = photos.filter((p) => p.BelongTo === belongToIndex || p.BelongTo === null || p.BelongTo === undefined);
+        }
+
+        // 只看已选
+        if (partnerShowSelectedOnly) {
+          photos = photos.filter((p) => selectedPartnerPhotoId === p.OrderAlbumID);
+        }
+
+        return photos;
       }
 
       function getVisibleGroupPhotos() {
-        return groupShowSelectedOnly
-          ? groupPhotos.filter((p) => selectedGroupPhotoIds.has(p.OrderAlbumID))
-          : groupPhotos;
+        const belongToIndex = getSelectedGroupIndex();
+        let photos = groupPhotos;
+
+        // 根据 BelongTo 过滤
+        if (belongToIndex !== null) {
+          photos = photos.filter((p) => p.BelongTo === belongToIndex || p.BelongTo === null || p.BelongTo === undefined);
+        }
+
+        // 只看已选
+        if (groupShowSelectedOnly) {
+          photos = photos.filter((p) => selectedGroupPhotoIds.has(p.OrderAlbumID));
+        }
+
+        return photos;
       }
 
       function updateFilterBtn() {
@@ -1361,10 +1401,40 @@
         }
       }
 
+      // 获取当前同桌的照片 ID 列表（基于 BelongTo 过滤）
+      function getCurrentPartnerPhotoIds() {
+        const belongToIndex = getSelectedPartnerIndex();
+        if (belongToIndex === null) {
+          // 未选择同桌，返回所有同桌照
+          return partnerPhotos.map(p => p.OrderAlbumID);
+        }
+        // 返回属于当前同桌的照片（BelongTo 匹配或为 null/undefined）
+        return partnerPhotos
+          .filter(p => p.BelongTo === belongToIndex || p.BelongTo === null || p.BelongTo === undefined)
+          .map(p => p.OrderAlbumID);
+      }
+
+      // 获取当前小组的照片 ID 列表（基于 BelongTo 过滤）
+      function getCurrentGroupPhotoIds() {
+        const belongToIndex = getSelectedGroupIndex();
+        if (belongToIndex === null) {
+          // 未选择小组，返回所有小组照
+          return groupPhotos.map(p => p.OrderAlbumID);
+        }
+        // 返回属于当前小组的照片（BelongTo 匹配或为 null/undefined）
+        return groupPhotos
+          .filter(p => p.BelongTo === belongToIndex || p.BelongTo === null || p.BelongTo === undefined)
+          .map(p => p.OrderAlbumID);
+      }
+
       function updateSelectionInfo() {
         if (currentTab === 'partner') {
           const selectedPartner = partnerSelect.value || '未选择同桌';
-          if (selectedPartnerPhotoId) {
+          // 获取当前同桌的照片 ID 列表
+          const currentPartnerIds = getCurrentPartnerPhotoIds();
+          // 检查当前选中的照片是否属于当前同桌
+          const isCurrentPartnerPhoto = selectedPartnerPhotoId && currentPartnerIds.includes(selectedPartnerPhotoId);
+          if (isCurrentPartnerPhoto) {
             selectionInfo.innerText = `${selectedPartner} | 已选 1 张 (ID: ${selectedPartnerPhotoId})`;
             selectionInfo.style.background = '#d1fae5';
           } else {
@@ -1373,10 +1443,18 @@
           }
         } else {
           const selectedGroup = groupSelect.value || '未选择小组';
-          const count = selectedGroupPhotoIds.size;
-          selectionInfo.innerText = `${selectedGroup} | 已选 ${count}/12 张`;
-          if (count === 12) selectionInfo.style.background = '#d1fae5';
-          else selectionInfo.style.background = '#eef2ff';
+          // 获取当前小组的照片 ID 列表
+          const currentGroupIds = getCurrentGroupPhotoIds();
+          // 统计当前小组中被选中的照片
+          const selectedCount = Array.from(selectedGroupPhotoIds)
+            .filter(id => currentGroupIds.includes(id))
+            .length;
+          selectionInfo.innerText = `${selectedGroup} | 已选 ${selectedCount}/${STANDARD_GROUP_COUNT} 张`;
+          if (selectedCount === STANDARD_GROUP_COUNT) {
+            selectionInfo.style.background = '#d1fae5';
+          } else {
+            selectionInfo.style.background = '#eef2ff';
+          }
         }
       }
 
@@ -1391,8 +1469,11 @@
             document.querySelector('.scroll-area').scrollTo({ top: 0, behavior: 'smooth' });
             return;
           }
-          if (!selectedPartnerPhotoId) {
-            alert('请先选择一张同桌照');
+          // 获取当前同桌的照片 ID 列表
+          const currentPartnerIds = getCurrentPartnerPhotoIds();
+          // 检查当前选中的照片是否属于当前同桌
+          if (!selectedPartnerPhotoId || !currentPartnerIds.includes(selectedPartnerPhotoId)) {
+            alert('请先选择一张当前同桌的照片');
             return;
           }
           outputText = `${selectedPartner}:\n  - ${selectedPartnerPhotoId}`;
@@ -1404,22 +1485,29 @@
             document.querySelector('.scroll-area').scrollTo({ top: 0, behavior: 'smooth' });
             return;
           }
-          if (selectedGroupPhotoIds.size === 0) {
-            alert('请至少选择一张小组照');
+          // 获取当前小组的照片 ID 列表
+          const currentGroupIds = getCurrentGroupPhotoIds();
+          // 过滤出当前小组中被选中的照片
+          const selectedIdsInGroup = Array.from(selectedGroupPhotoIds)
+            .filter(id => currentGroupIds.includes(id));
+
+          if (selectedIdsInGroup.length === 0) {
+            alert('请至少选择一张当前小组的照片');
             return;
           }
-          const count = selectedGroupPhotoIds.size;
+
+          const count = selectedIdsInGroup.length;
           // 不再强制要求12张，允许少选或超选
-          const ids = Array.from(selectedGroupPhotoIds).sort((a, b) => a - b);
+          const ids = selectedIdsInGroup.sort((a, b) => a - b);
           outputText = `${selectedGroup}:\n`;
           ids.forEach((id) => {
             outputText += `  - ${id}\n`;
           });
           outputText = outputText.trim();
 
-          // 如果不是12张，给出提示
-          if (count !== 12) {
-            if (!confirm(`当前已选 ${count} 张小组照（不是12张），确定要复制吗？`)) {
+          // 如果不是全部选中，给出提示
+          if (count !== STANDARD_GROUP_COUNT) {
+            if (!confirm(`当前已选 ${count}/${STANDARD_GROUP_COUNT} 张小组照，确定要复制吗？`)) {
               return;
             }
           }
@@ -1569,12 +1657,14 @@
 
       confirmBtn.addEventListener('click', confirmCurrentTab);
 
-      // 监听下拉框变化，更新顶部显示并保存
+      // 监听下拉框变化，更新顶部显示并保存，重新渲染照片
       partnerSelect.addEventListener('change', () => {
+        renderPartnerPhotos();
         updateSelectionInfo();
         saveToStorage();
       });
       groupSelect.addEventListener('change', () => {
+        renderGroupPhotos();
         updateSelectionInfo();
         saveToStorage();
       });
