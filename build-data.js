@@ -9,6 +9,7 @@ const RESPONSE_FILE = path.join(DATA_DIR, 'response.json');
 const PARTNERS_FILE = path.join(DATA_DIR, 'partners.json');
 const GROUPS_FILE = path.join(DATA_DIR, 'groups.json');
 const IMAGES_FILE = path.join(DATA_DIR, 'images.json');
+const FACE_GROUP_REPORT_FILE = path.join(DATA_DIR, 'face-group-report.json');
 const MERGED_DATA_FILE = path.join(DATA_DIR, 'data.json');
 const ENCRYPTED_DATA_FILE = path.join(DATA_DIR, 'data.js');
 const DESKMATE_DIR = path.join(DATA_DIR, '同桌照');
@@ -141,6 +142,31 @@ function buildBelongToMap(dirPath, jsonFile, albumType, isPartner) {
   return belongToMap;
 }
 
+// 从 face_group.py 生成的报告中构建 文件名 -> SceneId 的映射
+function buildSceneMap() {
+  const sceneMap = {};
+  if (!fs.existsSync(FACE_GROUP_REPORT_FILE)) {
+    console.log(`📁 未找到 ${FACE_GROUP_REPORT_FILE}，跳过 SceneId（请先运行 npm run face-group）`);
+    return sceneMap;
+  }
+  let report;
+  try {
+    report = JSON.parse(fs.readFileSync(FACE_GROUP_REPORT_FILE, 'utf8'));
+  } catch (err) {
+    console.error(`❌ 无法读取 ${FACE_GROUP_REPORT_FILE}:`, err.message);
+    return sceneMap;
+  }
+  for (const key of ['partner', 'group']) {
+    for (const item of report[key] || []) {
+      if (item && item.scene_id && item.image) {
+        // item.image 是移动前的原始路径，basename 与 response.json 中的文件名一致
+        sceneMap[path.basename(item.image)] = item.scene_id;
+      }
+    }
+  }
+  return sceneMap;
+}
+
 // 从 response.json 提取 AlbumType 为 "2" 或 "4" 的图片数据，并添加 BelongTo
 function step4_transformImages() {
   console.log('📝 提取图片数据...');
@@ -161,6 +187,11 @@ function step4_transformImages() {
   const belongToMap = { ...partnerBelongTo, ...groupBelongTo };
   console.log(`📝 BelongTo 映射构建完成，目录中共 ${Object.keys(belongToMap).length} 张照片`);
 
+  // 构建 SceneId 映射（按文件名）
+  console.log('📝 构建 SceneId 映射...');
+  const sceneMap = buildSceneMap();
+  console.log(`📝 SceneId 映射构建完成，共 ${Object.keys(sceneMap).length} 张照片有场景信息`);
+
   // 提取 AlbumType 为 "2" 或 "4" 的数据，并添加 BelongTo
   // 注意：需要将 OrderAlbumID 转换为字符串来查询 belongToMap
   // 使用 ?? 而不是 ||，因为 0 是有效的 BelongTo 值
@@ -168,12 +199,14 @@ function step4_transformImages() {
     .filter(item => item.AlbumType === '2' || item.AlbumType === '4')
     .map(item => {
       const belongTo = belongToMap[String(item.OrderAlbumID)];
+      const sceneId = sceneMap[path.basename(item.DownPhotoPic)];
       return {
         OrderAlbumID: item.OrderAlbumID,
         DownPhotoPic: item.DownPhotoPic,
         SmallPath: item.SmallPath,
         AlbumType: item.AlbumType,
-        BelongTo: belongTo !== undefined ? belongTo : null
+        BelongTo: belongTo !== undefined ? belongTo : null,
+        SceneId: sceneId !== undefined ? sceneId : null
       };
     });
 
