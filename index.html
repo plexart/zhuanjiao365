@@ -604,6 +604,16 @@
       .big-view-next-btn {
         right: 16px;
       }
+      .big-view-nav-btn.disabled {
+        opacity: 0.2;
+        pointer-events: none;
+        cursor: not-allowed;
+      }
+      .big-view-nav-btn.disabled:hover {
+        opacity: 0.2;
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateY(-50%);
+      }
 
       .big-view-photo-id {
         position: absolute;
@@ -1135,6 +1145,22 @@
           // 更新图片ID显示
           const currentPhoto = photos[currentIndex];
           photoIdDisplay.textContent = `ID: ${currentPhoto.OrderAlbumID}`;
+          // 更新导航按钮禁用状态
+          updateNavButtons();
+        }
+
+        // 更新导航按钮禁用状态
+        function updateNavButtons() {
+          if (currentIndex <= 0) {
+            prevBtn.classList.add('disabled');
+          } else {
+            prevBtn.classList.remove('disabled');
+          }
+          if (currentIndex >= photos.length - 1) {
+            nextBtn.classList.add('disabled');
+          } else {
+            nextBtn.classList.remove('disabled');
+          }
         }
 
         // 选择/反选按钮（圆形，类似列表页）
@@ -1189,6 +1215,8 @@
 
         // 初始化选择按钮状态
         updateSelectBtn();
+        // 初始化导航按钮禁用状态
+        updateNavButtons();
 
         // 点击背景关闭
         modal.addEventListener('click', (e) => {
