@@ -217,6 +217,27 @@
         border-color: #3b82f6;
         background: #eff6ff;
       }
+      /* 同一场景的多张照片：用层叠卡片的样式表示背后还有照片 */
+      .photo-item.scene-multi {
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05),
+          5px 5px 0 -1px #ffffff, 6px 6px 0 0 rgba(15, 23, 42, 0.12),
+          10px 10px 0 -1px #ffffff, 11px 11px 0 0 rgba(15, 23, 42, 0.1);
+      }
+      .scene-count {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: rgba(15, 23, 42, 0.75);
+        color: #fff;
+        border-radius: 30px;
+        padding: 2px 9px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        line-height: 1.3;
+        z-index: 2;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        pointer-events: none;
+      }
       .photo-img-wrapper {
         position: relative;
         cursor: pointer;
@@ -738,6 +759,10 @@
       let partnerPhotos = []; // AlbumType == "4"
       let groupPhotos = []; // AlbumType == "2"
 
+      // 场景 key -> 该场景下按原顺序排列的照片列表（用于大图在同一场景内切换）
+      let partnerSceneIndex = new Map();
+      let groupSceneIndex = new Map();
+
       // 小组照标准数量
       const STANDARD_GROUP_COUNT = 12;
 
@@ -844,7 +869,7 @@
       }
 
       // 查看大图
-      function showBigImage(url, photoId, isGroup = false) {
+      function showBigImage(url, photoId, isGroup = false, scenePhotos = null) {
         const modal = document.createElement('div');
         modal.style.position = 'fixed';
         modal.style.top = 0;
@@ -858,8 +883,15 @@
         modal.style.zIndex = 9999;
         modal.style.overflow = 'hidden';
 
-        // 获取当前照片列表和索引
-        const photos = isGroup ? getVisibleGroupPhotos() : getVisiblePartnerPhotos();
+        // 获取当前照片列表和索引：大图的上一张/下一张只在同一场景内切换
+        let photos = (scenePhotos && scenePhotos.length)
+          ? scenePhotos
+          : (isGroup ? getVisibleGroupPhotos() : getVisiblePartnerPhotos());
+        // 同一场景内：把点击的这张旋转到第一张，其余按原顺序排在后面（都靠“下一张”往后翻）
+        if (scenePhotos && scenePhotos.length) {
+          const start = photos.findIndex(p => p.DownPhotoPic === url);
+          if (start > 0) photos = photos.slice(start).concat(photos.slice(0, start));
+        }
         let currentIndex = photos.findIndex(p => p.DownPhotoPic === url);
 
         // 创建图片容器
@@ -1262,6 +1294,32 @@
         return index >= 0 ? index : null;
       }
 
+      // ==================== 场景分组 ====================
+      // 同一场景（SceneId 相同）的照片视为一组；没有 SceneId 的照片各自单独成组。
+      function sceneKeyOf(photo) {
+        return photo.SceneId ? 'scene:' + photo.SceneId : 'id:' + photo.OrderAlbumID;
+      }
+
+      // 把照片按场景分组，保持原有顺序。每组挑一张代表照：
+      // 若该场景内有已选中的照片，则代表照为第一张已选中的；否则为该场景的第一张。
+      function groupByScene(photos, isSelectedFn) {
+        const map = new Map();
+        const order = [];
+        for (const p of photos) {
+          const key = sceneKeyOf(p);
+          if (!map.has(key)) {
+            map.set(key, []);
+            order.push(key);
+          }
+          map.get(key).push(p);
+        }
+        return order.map((key) => {
+          const list = map.get(key);
+          const representative = list.find((p) => isSelectedFn(p)) || list[0];
+          return { key, photos: list, representative };
+        });
+      }
+
       // 渲染同桌照
       // ==================== 过滤（只看已选 + BelongTo） ====================
       function getVisiblePartnerPhotos() {
@@ -1318,18 +1376,25 @@
             '<div class="empty-tip">暂无已选同桌照</div>';
           return;
         }
+        const isSelectedFn = (p) => selectedPartnerPhotoId === p.OrderAlbumID;
+        const scenes = groupByScene(visiblePhotos, isSelectedFn);
+        partnerSceneIndex = new Map(scenes.map((s) => [s.key, s.photos]));
         let html = '';
-        visiblePhotos.forEach((photo) => {
-          const isSelected = selectedPartnerPhotoId === photo.OrderAlbumID;
+        scenes.forEach((scene) => {
+          const rep = scene.representative;
+          const count = scene.photos.length;
+          const multi = count > 1;
+          const isSelected = isSelectedFn(rep);
           html += `
-                <div class="photo-item ${isSelected ? 'selected' : ''}" data-id="${photo.OrderAlbumID}">
-                    <div class="photo-img-wrapper" data-big="${photo.DownPhotoPic}">
-                        <img src="${photo.SmallPath}" alt="缩略图" loading="lazy">
-                        <div class="select-checkbox ${isSelected ? 'checked' : 'empty'}" data-select-id="${photo.OrderAlbumID}">
+                <div class="photo-item ${isSelected ? 'selected' : ''} ${multi ? 'scene-multi' : ''}" data-id="${rep.OrderAlbumID}" data-scene-key="${scene.key}">
+                    <div class="photo-img-wrapper" data-big="${rep.DownPhotoPic}">
+                        <img src="${rep.SmallPath}" alt="缩略图" loading="lazy">
+                        <div class="select-checkbox ${isSelected ? 'checked' : 'empty'}" data-select-id="${rep.OrderAlbumID}">
                             ${isSelected ? '✓' : ''}
                         </div>
+                        ${multi ? `<div class="scene-count">共 ${count} 张</div>` : ''}
                     </div>
-                    <div class="photo-id">ID: ${photo.OrderAlbumID}</div>
+                    <div class="photo-id">ID: ${rep.OrderAlbumID}</div>
                 </div>
             `;
         });
@@ -1346,7 +1411,8 @@
               const bigUrl = wrapper.dataset.big;
               const photoItem = wrapper.closest('.photo-item');
               const photoId = parseInt(photoItem.dataset.id);
-              if (bigUrl) showBigImage(bigUrl, photoId, false);
+              const scenePhotos = partnerSceneIndex.get(photoItem.dataset.sceneKey);
+              if (bigUrl) showBigImage(bigUrl, photoId, false, scenePhotos);
             });
           });
 
@@ -1389,18 +1455,25 @@
             '<div class="empty-tip">暂无已选小组照</div>';
           return;
         }
+        const isSelectedFn = (p) => selectedGroupPhotoIds.has(p.OrderAlbumID);
+        const scenes = groupByScene(visiblePhotos, isSelectedFn);
+        groupSceneIndex = new Map(scenes.map((s) => [s.key, s.photos]));
         let html = '';
-        visiblePhotos.forEach((photo) => {
-          const isSelected = selectedGroupPhotoIds.has(photo.OrderAlbumID);
+        scenes.forEach((scene) => {
+          const rep = scene.representative;
+          const count = scene.photos.length;
+          const multi = count > 1;
+          const isSelected = isSelectedFn(rep);
           html += `
-                <div class="photo-item ${isSelected ? 'selected' : ''}" data-id="${photo.OrderAlbumID}">
-                    <div class="photo-img-wrapper" data-big="${photo.DownPhotoPic}">
-                        <img src="${photo.SmallPath}" alt="缩略图" loading="lazy">
-                        <div class="select-checkbox ${isSelected ? 'checked' : 'empty'}" data-select-id="${photo.OrderAlbumID}">
+                <div class="photo-item ${isSelected ? 'selected' : ''} ${multi ? 'scene-multi' : ''}" data-id="${rep.OrderAlbumID}" data-scene-key="${scene.key}">
+                    <div class="photo-img-wrapper" data-big="${rep.DownPhotoPic}">
+                        <img src="${rep.SmallPath}" alt="缩略图" loading="lazy">
+                        <div class="select-checkbox ${isSelected ? 'checked' : 'empty'}" data-select-id="${rep.OrderAlbumID}">
                             ${isSelected ? '✓' : ''}
                         </div>
+                        ${multi ? `<div class="scene-count">共 ${count} 张</div>` : ''}
                     </div>
-                    <div class="photo-id">ID: ${photo.OrderAlbumID}</div>
+                    <div class="photo-id">ID: ${rep.OrderAlbumID}</div>
                 </div>
             `;
         });
@@ -1417,7 +1490,8 @@
               const bigUrl = wrapper.dataset.big;
               const photoItem = wrapper.closest('.photo-item');
               const photoId = parseInt(photoItem.dataset.id);
-              if (bigUrl) showBigImage(bigUrl, photoId, true);
+              const scenePhotos = groupSceneIndex.get(photoItem.dataset.sceneKey);
+              if (bigUrl) showBigImage(bigUrl, photoId, true, scenePhotos);
             });
           });
 
