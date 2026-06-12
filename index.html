@@ -991,54 +991,88 @@
         function createCircleBtn(content, onClick, isSelected = false) {
           const btn = document.createElement('button');
           if (isSelected) {
-            // 选择框样式
+            // 选择框样式 - 屏幕左上角
             btn.className = 'select-checkbox checked';
             btn.style.position = 'absolute';
-            btn.style.top = '20px';
-            btn.style.left = '20px';
-            btn.style.transition = 'opacity 0.2s ease';
+            btn.style.top = '16px';
+            btn.style.left = '16px';
+            btn.style.transition = 'opacity 0.2s ease, transform 0.15s ease';
+            btn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3)';
+            btn.style.zIndex = '10001';
             btn.textContent = content;
+            // 添加 hover 效果
+            btn.addEventListener('mouseenter', () => {
+              btn.style.transform = 'scale(1.1)';
+            });
+            btn.addEventListener('mouseleave', () => {
+              btn.style.transform = 'scale(1)';
+            });
           } else {
-            // 关闭按钮样式
-            btn.style.background = 'rgba(0, 0, 0, 0.3)';
+            // 关闭按钮样式 - 屏幕右上角
+            btn.style.background = 'rgba(255, 255, 255, 0.15)';
             btn.style.color = 'white';
             btn.style.border = 'none';
-            btn.style.borderRadius = '30px';
-            btn.style.width = '24px';
-            btn.style.height = '24px';
+            btn.style.borderRadius = '50%';
+            btn.style.width = '40px';
+            btn.style.height = '40px';
             btn.style.display = 'flex';
             btn.style.alignItems = 'center';
             btn.style.justifyContent = 'center';
             btn.style.cursor = 'pointer';
-            btn.style.fontSize = '14px';
-            btn.style.fontWeight = 'bold';
+            btn.style.fontSize = '18px';
+            btn.style.fontWeight = 'normal';
             btn.style.position = 'absolute';
-            btn.style.top = '20px';
-            btn.style.right = '20px';
-            btn.style.transition = 'opacity 0.2s ease';
+            btn.style.top = '16px';
+            btn.style.right = '16px';
+            btn.style.transition = 'opacity 0.2s ease, background 0.2s ease, transform 0.15s ease';
+            btn.style.backdropFilter = 'blur(10px)';
+            btn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
+            btn.style.zIndex = '10001';
             btn.textContent = content;
+            // 添加 hover 效果
+            btn.addEventListener('mouseenter', () => {
+              btn.style.background = 'rgba(255, 255, 255, 0.25)';
+              btn.style.transform = 'scale(1.05)';
+            });
+            btn.addEventListener('mouseleave', () => {
+              btn.style.background = 'rgba(255, 255, 255, 0.15)';
+              btn.style.transform = 'scale(1)';
+            });
           }
           btn.addEventListener('click', onClick);
           return btn;
         }
 
-        // 上一张按钮（左侧箭头）
+        // 上一张按钮（屏幕左侧）
         const prevBtn = document.createElement('button');
-        prevBtn.innerHTML = '<svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M20 6L12 16L20 26" stroke="rgba(0,0,0,0.5)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        prevBtn.style.background = 'transparent';
+        prevBtn.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M17 5L10 14L17 23" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        prevBtn.style.background = 'rgba(255, 255, 255, 0.15)';
         prevBtn.style.border = 'none';
-        prevBtn.style.width = '44px';
-        prevBtn.style.height = '44px';
+        prevBtn.style.borderRadius = '50%';
+        prevBtn.style.width = '48px';
+        prevBtn.style.height = '48px';
         prevBtn.style.display = 'flex';
         prevBtn.style.alignItems = 'center';
         prevBtn.style.justifyContent = 'center';
         prevBtn.style.cursor = 'pointer';
         prevBtn.style.position = 'absolute';
-        prevBtn.style.left = '5px';
+        prevBtn.style.left = '16px';
         prevBtn.style.top = '50%';
         prevBtn.style.transform = 'translateY(-50%)';
         prevBtn.style.padding = '0';
-        prevBtn.style.transition = 'opacity 0.2s ease';
+        prevBtn.style.transition = 'opacity 0.2s ease, background 0.2s ease, transform 0.15s ease';
+        prevBtn.style.backdropFilter = 'blur(10px)';
+        prevBtn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
+        prevBtn.style.zIndex = '10001';
+        // 添加 hover 效果
+        prevBtn.addEventListener('mouseenter', () => {
+          prevBtn.style.background = 'rgba(255, 255, 255, 0.25)';
+          prevBtn.style.transform = 'translateY(-50%) scale(1.08)';
+        });
+        prevBtn.addEventListener('mouseleave', () => {
+          prevBtn.style.background = 'rgba(255, 255, 255, 0.15)';
+          prevBtn.style.transform = 'translateY(-50%) scale(1)';
+        });
         prevBtn.addEventListener('click', () => {
           if (currentIndex > 0) {
             currentIndex--;
@@ -1047,23 +1081,36 @@
           }
         });
 
-        // 下一张按钮（右侧箭头）
+        // 下一张按钮（屏幕右侧）
         const nextBtn = document.createElement('button');
-        nextBtn.innerHTML = '<svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M12 6L20 16L12 26" stroke="rgba(0,0,0,0.5)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        nextBtn.style.background = 'transparent';
+        nextBtn.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M11 5L18 14L11 23" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        nextBtn.style.background = 'rgba(255, 255, 255, 0.15)';
         nextBtn.style.border = 'none';
-        nextBtn.style.width = '44px';
-        nextBtn.style.height = '44px';
+        nextBtn.style.borderRadius = '50%';
+        nextBtn.style.width = '48px';
+        nextBtn.style.height = '48px';
         nextBtn.style.display = 'flex';
         nextBtn.style.alignItems = 'center';
         nextBtn.style.justifyContent = 'center';
         nextBtn.style.cursor = 'pointer';
         nextBtn.style.position = 'absolute';
-        nextBtn.style.right = '5px';
+        nextBtn.style.right = '16px';
         nextBtn.style.top = '50%';
         nextBtn.style.transform = 'translateY(-50%)';
         nextBtn.style.padding = '0';
-        nextBtn.style.transition = 'opacity 0.2s ease';
+        nextBtn.style.transition = 'opacity 0.2s ease, background 0.2s ease, transform 0.15s ease';
+        nextBtn.style.backdropFilter = 'blur(10px)';
+        nextBtn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
+        nextBtn.style.zIndex = '10001';
+        // 添加 hover 效果
+        nextBtn.addEventListener('mouseenter', () => {
+          nextBtn.style.background = 'rgba(255, 255, 255, 0.25)';
+          nextBtn.style.transform = 'translateY(-50%) scale(1.08)';
+        });
+        nextBtn.addEventListener('mouseleave', () => {
+          nextBtn.style.background = 'rgba(255, 255, 255, 0.15)';
+          nextBtn.style.transform = 'translateY(-50%) scale(1)';
+        });
         nextBtn.addEventListener('click', () => {
           if (currentIndex < photos.length - 1) {
             currentIndex++;
@@ -1108,8 +1155,15 @@
           selectBtn.textContent = isSelected ? '✓' : '';
           if (isSelected) {
             selectBtn.className = 'select-checkbox checked';
+            selectBtn.style.background = '#3b82f6';
+            selectBtn.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.5)';
+            selectBtn.style.backdropFilter = 'none';
           } else {
             selectBtn.className = 'select-checkbox empty';
+            // 大图视图：未选中时也显示明显的样式
+            selectBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+            selectBtn.style.boxShadow = '0 0 0 2px rgba(255, 255, 255, 0.4)';
+            selectBtn.style.backdropFilter = 'blur(10px)';
           }
         }
 
@@ -1118,10 +1172,11 @@
           closeModal();
         });
 
-        imgContainer.appendChild(prevBtn);
-        imgContainer.appendChild(nextBtn);
-        imgContainer.appendChild(selectBtn);
-        imgContainer.appendChild(closeBtn);
+        // 按钮直接添加到 modal（相对于屏幕定位）
+        modal.appendChild(prevBtn);
+        modal.appendChild(nextBtn);
+        modal.appendChild(selectBtn);
+        modal.appendChild(closeBtn);
         modal.appendChild(imgContainer);
 
         // 初始化选择按钮状态
