@@ -981,10 +981,12 @@
         // 根据缩放状态显示/隐藏控制按钮
         function updateControlsVisibility() {
           const isZoomed = scale > 1.1;
-          prevBtn.style.opacity = isZoomed ? '0' : '1';
-          prevBtn.style.pointerEvents = isZoomed ? 'none' : 'auto';
-          nextBtn.style.opacity = isZoomed ? '0' : '1';
-          nextBtn.style.pointerEvents = isZoomed ? 'none' : 'auto';
+          // 缩放时用内联样式隐藏上一张/下一张；未缩放时清掉内联样式，
+          // 交还给 .disabled 类控制，避免内联 opacity 覆盖按钮的禁用态
+          prevBtn.style.opacity = isZoomed ? '0' : '';
+          prevBtn.style.pointerEvents = isZoomed ? 'none' : '';
+          nextBtn.style.opacity = isZoomed ? '0' : '';
+          nextBtn.style.pointerEvents = isZoomed ? 'none' : '';
           selectBtn.style.opacity = isZoomed ? '0' : '1';
           selectBtn.style.pointerEvents = isZoomed ? 'none' : 'auto';
           closeBtn.style.opacity = isZoomed ? '0' : '1';
