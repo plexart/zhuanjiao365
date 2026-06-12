@@ -120,7 +120,7 @@ A detailed grouping report is written to `data/face-group-report.json` on every 
 ## Build
 
 ```bash
-npm run build
+npm run build-data
 ```
 
 ## Sync Selected Photos
