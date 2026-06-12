@@ -7,6 +7,9 @@ Approach:
        every detected face must be recognized, then the recognized set of people
        selects the partners.json / groups.json entry whose members contain them.
     3. Matched photos are moved into the matching subdirectory.
+    4. Within each subdirectory, the matched photos are clustered into "scenes" (a burst of
+       the same people in one setup) using the EXIF capture time and the recognized people,
+       and a scene_id is written to data/face-group-report.json.
 
 Notes:
     - Face descriptors are cached in data/.face-cache/; unchanged sources and
@@ -34,7 +37,9 @@ import shutil
 import subprocess
 import sys
 import warnings
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 import numpy as np
 
@@ -56,6 +61,13 @@ WORKER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "face_worker.p
 RESULT_MARKER = "__FACE_RESULT__"
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 SPLIT_RE = re.compile(r"[\s,，]+")
+
+# Scene clustering: photos of the same people in one scene are bursts taken close in time.
+# (defaults; overridable via --scene-gap-partner / --scene-gap-group)
+SCENE_GAP_PARTNER = 15  # 同桌照：间隔超过该秒数视为另一个场景
+SCENE_GAP_GROUP = 50    # 小组照：间隔超过该秒数视为另一个场景
+EXIF_DATETIME_FMT = "%Y:%m:%d %H:%M:%S"   # EXIF DateTimeOriginal, e.g. "2026:06:05 09:52:02"
+SHOT_TIME_FMT = "%Y-%m-%d %H:%M:%S"       # serialized form stored in the report
 
 
 # ----------------------------- Basic utilities -----------------------------
@@ -107,6 +119,28 @@ def load_json_safe(path, fallback):
             return json.load(fp)
     except Exception:  # noqa: BLE001
         return fallback
+
+
+def exif_shot_time(image_path):
+    """Return the EXIF capture time (DateTimeOriginal) as a string '%Y-%m-%d %H:%M:%S', or None.
+
+    Falls back to DateTimeDigitized; the base DateTime (tag 306) is intentionally ignored
+    because it often reflects processing time rather than capture time.
+    """
+    try:
+        from PIL import Image
+
+        with Image.open(image_path) as im:
+            exif = im.getexif()
+            raw = None
+            ifd = exif.get_ifd(0x8769)  # Exif IFD
+            if ifd:
+                raw = ifd.get(36867) or ifd.get(36868)  # DateTimeOriginal / DateTimeDigitized
+            if not raw:
+                return None
+            return datetime.strptime(str(raw).strip(), EXIF_DATETIME_FMT).strftime(SHOT_TIME_FMT)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 # ----------------------------- Roster parsing -----------------------------
@@ -386,6 +420,149 @@ def move_into(file_path, base_dir, subdir):
     return dest
 
 
+def recognized_people(faces, person_refs, threshold):
+    """Return ({name: best_score}, unknown_count) for the faces detected in a photo."""
+    present = {}
+    unknown = 0
+    for nm, s in identify_faces(faces, person_refs, threshold):
+        if nm:
+            present[nm] = max(present.get(nm, -1.0), s)
+        else:
+            unknown += 1
+    return present, unknown
+
+
+def scan_sorted_photos(directory, detector, cache, config, person_refs):
+    """Build result entries for photos already sorted into subdirectories of `directory`.
+
+    Scene clustering must cover every photo currently in a deskmate/group subdirectory, not
+    just the ones moved in this run: list_images() is non-recursive, so on a re-run the
+    already-sorted photos would otherwise be invisible and get no scene_id. Face descriptors
+    are cached, so re-identifying these photos is cheap.
+    """
+    out = []
+    if not os.path.isdir(directory):
+        return out
+    for subdir in sorted(os.listdir(directory)):
+        subpath = os.path.join(directory, subdir)
+        if not os.path.isdir(subpath):
+            continue
+        for image_path in list_images(subpath):
+            shot_time = exif_shot_time(image_path)
+            try:
+                faces = cache.get_faces(detector, image_path)
+            except Exception as exc:  # noqa: BLE001
+                out.append({"image": image_path, "status": "error", "error": str(exc),
+                            "subdir": subdir, "shot_time": shot_time})
+                continue
+            present, unknown = recognized_people(faces, person_refs, config.threshold)
+            out.append({
+                "image": image_path,
+                "status": "sorted",
+                "subdir": subdir,
+                "faces": len(faces),
+                "present": list(present.keys()),
+                "unknown": unknown,
+                "shot_time": shot_time,
+            })
+    return out
+
+
+def same_people(a, b):
+    """Whether two photos capture the same set of people.
+
+    Judged by the recognized identities, not the total face count: an unrelated bystander who
+    wanders into one shot is never recognized (not on the roster) and so must not split a scene.
+    - When every face in both photos is recognized, the recognized sets must be equal.
+    - When either photo has unrecognized faces (a bystander or a missed group member), the
+      recognized sets only need to be compatible: both non-empty and one a subset of the other.
+    """
+    pa, pb = set(a.get("present") or []), set(b.get("present") or [])
+    if (a.get("unknown") or 0) == 0 and (b.get("unknown") or 0) == 0:
+        return pa == pb
+    return bool(pa) and bool(pb) and (pa <= pb or pb <= pa)
+
+
+def is_same_scene(prev, cur, rule, gap_seconds):
+    """Whether `cur` belongs to the same scene as the preceding photo `prev`.
+
+    Photos without a capture time cannot be clustered, so they always start a new scene.
+    - partner: same scene iff the time gap is within `gap_seconds`.
+    - group: a gap beyond `gap_seconds` is always a new scene; within it, the same scene
+      only if the same people are present.
+    """
+    t1, t2 = prev.get("_dt"), cur.get("_dt")
+    if t1 is None or t2 is None:
+        return False
+    gap = abs((t2 - t1).total_seconds())
+    if rule == "partner":
+        return gap <= gap_seconds
+    if gap > gap_seconds:
+        return False
+    return same_people(prev, cur)
+
+
+def assign_scenes(results, rule, gap_seconds):
+    """Cluster the matched photos in each subdirectory into scenes and set result['scene_id'].
+
+    Returns the number of matched photos that had no capture time (each becomes its own scene).
+    """
+    by_subdir = defaultdict(list)
+    for r in results:
+        if not r or not r.get("subdir"):
+            continue
+        st = r.get("shot_time")
+        r["_dt"] = datetime.strptime(st, SHOT_TIME_FMT) if st else None
+        by_subdir[r["subdir"]].append(r)
+
+    missing_time = 0
+    for subdir in sorted(by_subdir):
+        items = by_subdir[subdir]
+        items.sort(
+            key=lambda r: (r["_dt"] is None, r["_dt"] or datetime.min, os.path.basename(r["image"]))
+        )
+        prev = None
+        local_n = 0
+        scene_id = None
+        for r in items:
+            if prev is None or not is_same_scene(prev, r, rule, gap_seconds):
+                local_n += 1
+                scene_id = f"{subdir}#{local_n}"
+            r["scene_id"] = scene_id
+            if r["_dt"] is None:
+                missing_time += 1
+            prev = r
+
+    for r in results:
+        if r and "_dt" in r:
+            del r["_dt"]
+    return missing_time
+
+
+def cluster_scenes(directory, run_results, rule, kind, detector, cache, config, person_refs):
+    """Assign scene_id after grouping is complete, returning the report entries for `directory`.
+
+    Done as a separate pass (not while moving photos) so it sees the final sorted state.
+    Non-dry-run: scan the subdirectories so photos sorted in earlier runs are included too.
+    Dry-run: nothing was moved, so cluster this run's matched results instead.
+    """
+    if config.dry_run:
+        results = run_results
+    else:
+        leftovers = [r for r in run_results if r and r.get("status") in ("unmatched", "error")]
+        results = scan_sorted_photos(directory, detector, cache, config, person_refs) + leftovers
+
+    gap_seconds = config.scene_gap_partner if rule == "partner" else config.scene_gap_group
+    missing_time = assign_scenes(results, rule, gap_seconds)
+    matched_count = sum(1 for r in results if r and r.get("subdir"))
+    scene_count = len({r["scene_id"] for r in results if r and r.get("scene_id")})
+    print(f"   {kind}: {matched_count} 张已分组照片归为 {scene_count} 个场景", end="")
+    if missing_time:
+        print(f"（其中 {missing_time} 张缺少拍摄时间，各自单独成一个场景）", end="")
+    print()
+    return results
+
+
 def process_photo_dir(directory, entries, kind, detector, cache, config, person_refs):
     images = list_images(directory)
     print(f"\n🗂️  处理{kind}（{directory}）：共 {len(images)} 张待分组照片")
@@ -398,24 +575,20 @@ def process_photo_dir(directory, entries, kind, detector, cache, config, person_
     def handle(index_path):
         index, image_path = index_path
         name = os.path.basename(image_path)
+        shot_time = exif_shot_time(image_path)  # read before any move so the path still exists
         try:
             faces = cache.get_faces(detector, image_path)
         except Exception as exc:  # noqa: BLE001
             print(f"  [{index + 1}/{total}] ❌ {name}: {exc}")
-            return index, {"image": image_path, "status": "error", "error": str(exc)}
+            return index, {"image": image_path, "status": "error", "error": str(exc), "shot_time": shot_time}
 
-        ids = identify_faces(faces, person_refs, config.threshold)
-        present = {}
-        for nm, s in ids:
-            if nm:
-                present[nm] = max(present.get(nm, -1.0), s)
-        unknown = sum(1 for nm, _ in ids if nm is None)
+        present, unknown = recognized_people(faces, person_refs, config.threshold)
 
         if not faces:
             print(f"  [{index + 1}/{total}] ❓ {name}: 未检测到人脸")
             return index, {
                 "image": image_path, "status": "unmatched", "reason": "no_face",
-                "faces": 0, "present": [],
+                "faces": 0, "present": [], "shot_time": shot_time,
             }
 
         # Require every face in the photo to be recognized (matches == faces); otherwise leave it unsorted
@@ -427,6 +600,7 @@ def process_photo_dir(directory, entries, kind, detector, cache, config, person_
             return index, {
                 "image": image_path, "status": "unmatched", "reason": "faces_unrecognized",
                 "faces": len(faces), "present": list(present.keys()), "unknown": unknown,
+                "shot_time": shot_time,
             }
 
         best = pick_entry(entries, present)
@@ -437,7 +611,7 @@ def process_photo_dir(directory, entries, kind, detector, cache, config, person_
             )
             return index, {
                 "image": image_path, "status": "unmatched", "reason": "no_entry",
-                "faces": len(faces), "present": list(present.keys()),
+                "faces": len(faces), "present": list(present.keys()), "shot_time": shot_time,
             }
 
         subdir = best["entry"]["subdir"]
@@ -455,8 +629,11 @@ def process_photo_dir(directory, entries, kind, detector, cache, config, person_
             "status": "matched(dry-run)" if config.dry_run else "moved",
             "subdir": subdir,
             "matched": best["matched"],
+            "faces": len(faces),
+            "present": list(present.keys()),
             "unknown": unknown,
             "dest": dest,
+            "shot_time": shot_time,
         }
 
     items = list(enumerate(images))
@@ -486,6 +663,14 @@ def parse_config():
     )
     p.add_argument("--concurrency", type=int, default=1, help="并发数（仅 --per-image-process 生效）")
     p.add_argument("--per-image-process", action="store_true", help="每张图片用独立子进程处理")
+    p.add_argument(
+        "--scene-gap-partner", type=int, default=SCENE_GAP_PARTNER,
+        help=f"同桌照场景间隔秒数，超过即视为新场景（默认 {SCENE_GAP_PARTNER}）",
+    )
+    p.add_argument(
+        "--scene-gap-group", type=int, default=SCENE_GAP_GROUP,
+        help=f"小组照场景间隔秒数，超过即视为新场景（默认 {SCENE_GAP_GROUP}）",
+    )
     p.add_argument("--dry-run", action="store_true", help="只输出分组结果，不移动文件")
     p.add_argument("--rescan", action="store_true", help="忽略缓存，强制重新检测")
     cfg = p.parse_args()
@@ -502,7 +687,7 @@ def check_dependencies():
     """
     missing = []
     for mod, pkg in (("cv2", "opencv-python-headless"), ("onnxruntime", "onnxruntime"),
-                     ("insightface", "insightface")):
+                     ("insightface", "insightface"), ("PIL", "pillow")):
         try:
             __import__(mod)
         except ImportError:
@@ -526,6 +711,7 @@ def main():
         f"det_thresh={config.det_thresh}, model={config.model}, "
         f"max_unknown_faces={config.max_unknown_faces}, "
         f"per_image_process={config.per_image_process}, concurrency={config.concurrency}, "
+        f"scene_gap_partner={config.scene_gap_partner}, scene_gap_group={config.scene_gap_group}, "
         f"dry_run={config.dry_run}, rescan={config.rescan}"
     )
 
@@ -553,6 +739,15 @@ def main():
         GROUP_PHOTO_DIR, groups, "小组照", detector, cache, config, person_refs,
     )
 
+    # Grouping is complete; now cluster the sorted photos into scenes (see cluster_scenes).
+    print("\n🎬 场景聚类")
+    partner_results = cluster_scenes(
+        PARTNER_PHOTO_DIR, partner_results, "partner", "同桌照", detector, cache, config, person_refs,
+    )
+    group_results = cluster_scenes(
+        GROUP_PHOTO_DIR, group_results, "group", "小组照", detector, cache, config, person_refs,
+    )
+
     report = {
         "config": vars(config),
         "partner": partner_results,
@@ -562,11 +757,12 @@ def main():
         json.dump(report, fp, ensure_ascii=False, indent=2)
 
     def summarize(rs):
-        moved = sum(1 for r in rs if r and r["status"] in ("moved", "matched(dry-run)"))
-        flagged = sum(1 for r in rs if r and r["status"] in ("moved", "matched(dry-run)") and r.get("unknown"))
+        grouped_states = ("moved", "matched(dry-run)", "sorted")
+        grouped = sum(1 for r in rs if r and r["status"] in grouped_states)
+        flagged = sum(1 for r in rs if r and r["status"] in grouped_states and r.get("unknown"))
         unmatched = sum(1 for r in rs if r and r["status"] == "unmatched")
         errored = sum(1 for r in rs if r and r["status"] == "error")
-        return f"已分组 {moved}（其中 {flagged} 张含未识别人脸待查），未匹配 {unmatched}，出错 {errored}"
+        return f"已分组 {grouped}（其中 {flagged} 张含未识别人脸待查），未匹配 {unmatched}，出错 {errored}"
 
     print("\n📊 汇总")
     print(f"   同桌照: {summarize(partner_results)}")

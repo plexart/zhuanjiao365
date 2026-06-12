@@ -89,6 +89,11 @@ How it works:
    - If the recognized people span multiple entries and none fully contains them, fall back to the entry with the largest overlap, but require at least 2 matched people; otherwise the photo is left unmatched.
 3. Matched photos are moved into a subdirectory named after the deskmate pair / group (e.g. `01_王琪_李轩/`, `第一组/`).
 4. When `--max-unknown-faces` lets a photo through with unrecognized faces still present, it is flagged for manual review (a `⚠️` note in the console, an `unknown` count in `data/face-group-report.json`, and a flagged tally in the summary). Those extra faces are usually profiles, faces reflected off surfaces such as car bodies, or bystanders in the background.
+5. After all photos are grouped, a separate pass scans the subdirectories (so photos sorted in earlier runs are included too — re-runs always produce a complete result) and clusters the matched photos into **scenes** — bursts of the same people in one setup, where usually only the best frame is kept — writing a `scene_id` for each photo in `data/face-group-report.json`. Photos are ordered by their EXIF `DateTimeOriginal`; a new scene starts when:
+   - **deskmate photos**: the gap to the previous photo exceeds 15s (configurable via `--scene-gap-partner`);
+   - **group photos**: the gap exceeds 50s (configurable via `--scene-gap-group`), or (within that window) the set of people changes. "Same people" is judged by the recognized identities, not the total face count, so an unrelated bystander wandering into one frame does not split a scene: when both photos are fully recognized the recognized sets must be equal, and when either has unrecognized faces the recognized sets only need to be compatible (both non-empty and one a subset of the other).
+   - A photo with no EXIF capture time becomes its own scene.
+     `build-data.js` then propagates each `scene_id` to `AlbumList` as `SceneId`, and the selection page (`index.html`) shows one stacked thumbnail per scene (the first selected photo if any, else the first), with the big-view prev/next navigating only within that scene.
 
 Notes:
 
@@ -110,6 +115,8 @@ Options:
 | `--max-unknown-faces <n>` | Max number of unrecognized faces allowed in a photo (default 0, i.e. require all recognized)    | `0`         |
 | `--per-image-process`     | Process each photo in its own subprocess (strict memory isolation)                              | off         |
 | `--concurrency <n>`       | Number of photos processed in parallel (only with `--per-image-process`)                        | `1`         |
+| `--scene-gap-partner <n>` | Deskmate scene gap in seconds; a larger gap starts a new scene                                  | `15`        |
+| `--scene-gap-group <n>`   | Group scene gap in seconds; a larger gap starts a new scene                                     | `50`        |
 | `--dry-run`               | Only print the grouping result, do not move files                                               | off         |
 | `--rescan`                | Ignore the cache and force re-detection                                                         | off         |
 
