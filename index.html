@@ -1129,6 +1129,9 @@
           translateY = 0;
           updateTransform();
           updateSelectBtn();
+          // 更新图片ID显示
+          const currentPhoto = photos[currentIndex];
+          photoIdDisplay.textContent = `ID: ${currentPhoto.OrderAlbumID}`;
         }
 
         // 选择/反选按钮（圆形，类似列表页）
@@ -1172,11 +1175,31 @@
           closeModal();
         });
 
+        // 图片ID显示（屏幕底部）
+        const photoIdDisplay = document.createElement('div');
+        photoIdDisplay.style.position = 'absolute';
+        photoIdDisplay.style.bottom = '16px';
+        photoIdDisplay.style.left = '50%';
+        photoIdDisplay.style.transform = 'translateX(-50%)';
+        photoIdDisplay.style.color = 'rgba(255, 255, 255, 0.5)';
+        photoIdDisplay.style.fontSize = '14px';
+        photoIdDisplay.style.fontWeight = '500';
+        photoIdDisplay.style.padding = '8px 16px';
+        photoIdDisplay.style.background = 'rgba(0, 0, 0, 0.3)';
+        photoIdDisplay.style.borderRadius = '20px';
+        photoIdDisplay.style.backdropFilter = 'blur(10px)';
+        photoIdDisplay.style.zIndex = '10001';
+        photoIdDisplay.style.pointerEvents = 'none';
+        // 初始化显示当前图片ID
+        const initialPhoto = photos[currentIndex];
+        photoIdDisplay.textContent = `ID: ${initialPhoto.OrderAlbumID}`;
+
         // 按钮直接添加到 modal（相对于屏幕定位）
         modal.appendChild(prevBtn);
         modal.appendChild(nextBtn);
         modal.appendChild(selectBtn);
         modal.appendChild(closeBtn);
+        modal.appendChild(photoIdDisplay);
         modal.appendChild(imgContainer);
 
         // 初始化选择按钮状态
