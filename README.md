@@ -138,17 +138,21 @@ Sync your photo selections with the server:
 npm run sync
 ```
 
-**Before running**, create `data/selected.json` with the photo IDs you want to select:
+**Before running**, create `data/selected.txt` with the photo IDs you want to select:
 
-```json
-{
-  "selected": [12345678, 87654321]
-}
+```
+16: 张三, 李四:
+  - 12345678
+15: 王五, 赵六, 孙七:
+  - 87654321
+第三组: 周八, 吴九, 郑十:
+  - 11111111
+  - 22222222
 ```
 
 The script will:
 
-1. Compare `selected.json` with the current state in `response.json`
+1. Compare `selected.txt` with the current state in `response.json`
 2. Show you which photos will be selected/deselected
 3. Send requests to sync your selections using credentials from `.env`
 

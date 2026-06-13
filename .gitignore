@@ -1,7 +1,7 @@
 node_modules/
 /data/*
 !/data/data.js
-!/data/*.example.json
+!/data/*.example.*
 .env
 /models/
 .venv/

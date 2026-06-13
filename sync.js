@@ -7,7 +7,7 @@ const { loadEnv, writeEnv, getEnv } = require('./lib/env');
 // 配置文件路径
 const DATA_DIR = './data';
 const RESPONSE_FILE = path.join(DATA_DIR, 'response.json');
-const SELECTED_FILE = path.join(DATA_DIR, 'selected.json');
+const SELECTED_FILE = path.join(DATA_DIR, 'selected.txt');
 
 // API 配置
 const API_URL = 'https://miniapp.zhuanjiao365.com/Ashx/wechatEdit.ashx';
@@ -76,19 +76,46 @@ function loadResponseData() {
   }
 }
 
-// 读取 selected.json
+// 读取 selected.txt
+// 格式示例：
+// 16: 张三, 李四:
+//   - 13631664
+// 第三组: 刘雨瞳, 钟悠然, 第祎:
+//   - 13631255
+//   - 13631263
 function loadSelectedData() {
   try {
     const data = fs.readFileSync(SELECTED_FILE, 'utf8');
-    const json = JSON.parse(data);
-    // 支持两种格式：纯数组或包含 selected 的对象
-    if (Array.isArray(json)) {
-      return json;
+    const lines = data.split('\n');
+    const ids = [];
+    const idToGroup = new Map(); // ID 到组名的映射
+
+    let currentGroup = null;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      // 检查是否是组标题行（包含冒号且不是以 - 开头）
+      if (trimmed.includes(':') && !trimmed.startsWith('-')) {
+        currentGroup = trimmed.replace(/:$/, ''); // 去掉末尾的冒号
+      } else if (trimmed.startsWith('-')) {
+        // 是 ID 行
+        const id = trimmed.replace(/^-\s*/, '').trim();
+        const numId = parseInt(id, 10);
+        if (!isNaN(numId)) {
+          ids.push(numId);
+          if (currentGroup) {
+            idToGroup.set(numId, currentGroup);
+          }
+        }
+      }
     }
-    return [];
+
+    return { ids, idToGroup };
   } catch (err) {
-    // 文件不存在或格式错误，返回空数组
-    return [];
+    // 文件不存在或格式错误，返回空结果
+    return { ids: [], idToGroup: new Map() };
   }
 }
 
@@ -148,7 +175,7 @@ async function sync() {
   // 加载数据
   console.log('📝 加载数据...');
   const responseData = loadResponseData();
-  const selectedIds = loadSelectedData();
+  const { ids: selectedIds, idToGroup } = loadSelectedData();
 
   // 找到所有 State=2 且 AlbumType=2或4 的元素
   const currentSelected = responseData.ajaxDataTable
@@ -159,7 +186,7 @@ async function sync() {
     .map((item) => item.OrderAlbumID);
 
   console.log(`当前已选图片: ${currentSelected.length} 张`);
-  console.log(`selected.json 中记录: ${selectedIds.length} 张`);
+  console.log(`selected.txt 中记录: ${selectedIds.length} 张`);
 
   // 获取 response.json 中所有有效的 OrderAlbumID（用于验证 selected.json 中的 ID 是否存在）
   const allValidIds = new Set(
@@ -172,10 +199,10 @@ async function sync() {
   const currentSet = new Set(currentSelected);
   const selectedSet = new Set(selectedIds);
 
-  // 找出需要改为未选的（当前已选但不在 selected.json 中）
+  // 找出需要改为未选的（当前已选但不在 selected.txt 中）
   const toDeselect = currentSelected.filter((id) => !selectedSet.has(id));
 
-  // 找出需要改为已选的（在 selected.json 中但当前未选，且 ID 在 response.json 中存在）
+  // 找出需要改为已选的（在 selected.txt 中但当前未选，且 ID 在 response.json 中存在）
   const validToSelect = [];
   const invalidIds = [];
   for (const id of selectedIds) {
@@ -202,12 +229,16 @@ async function sync() {
     validToSelect.forEach((id) => console.log(`  - ${id}`));
   }
 
-  // 列出无效的 ID（在 selected.json 中但不在 response.json 中）
+  // 列出无效的 ID（在 selected.txt 中但不在 response.json 中）
   if (invalidIds.length > 0) {
     console.log(
       `\n⚠️  以下 ${invalidIds.length} 张图片在 response.json 中不存在，将跳过同步：`,
     );
-    invalidIds.forEach((id) => console.log(`  - ${id}`));
+    for (const id of invalidIds) {
+      const group = idToGroup.get(id);
+      const groupInfo = group ? ` [${group}]` : '';
+      console.log(`  - ${id}${groupInfo}`);
+    }
   }
 
   if (toDeselect.length === 0 && validToSelect.length === 0) {
