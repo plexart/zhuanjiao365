@@ -151,3 +151,59 @@ The script will:
 1. Compare `selected.json` with the current state in `response.json`
 2. Show you which photos will be selected/deselected
 3. Send requests to sync your selections using credentials from `.env`
+
+## Check Personal Photo Selections
+
+Check personal photo selection status:
+
+```bash
+npm run check-personal
+```
+
+This analyzes `data/response.json` and shows:
+
+- **Students** (photos ≥ 7): need to select 2 photos each
+- **Teachers** (photos < 7): need to select 1 photo each
+
+Output includes three sections for each group:
+
+- 🔴 Not enough selected
+- 🟡 Too many selected
+- 🟢 Exactly the required amount
+
+Example output:
+
+```
+📊 个人照选择情况统计（学生）
+========================
+
+🔴 未选够2张的学生 (2人):
+------------------------
+张三　　：1/2
+李四　　：0/2
+
+🟡 超过2张的学生 (1人):
+------------------------
+王五　　：3/2
+
+🟢 刚好选2张的学生 (1人):
+------------------------
+赵六　　：2/2
+
+========================
+📈 学生总计: 1/4  (25%)
+
+📊 老师选择情况
+========================
+
+🔴 未选够1张的老师 (2人):
+------------------------
+孙七　　：0/1
+周八　　：0/1
+
+========================
+📈 老师总计: 0/2  (0%)
+
+========================
+📈 全体总计: 1/6  (17%)
+```

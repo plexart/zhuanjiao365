@@ -9,7 +9,8 @@
     "sync": "node sync.js",
     "download": "node download.js",
     "download-images": "node download-images.js",
-    "face-group": "python3 face_group.py"
+    "face-group": "python3 face_group.py",
+    "check-personal": "node check-personal-photos.js"
   },
   "dependencies": {
     "crypto-js": "^4.2.0"
